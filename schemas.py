@@ -43,3 +43,39 @@ class CoupleRead(BaseModel):
     members: list[UserRead]
 
     model_config = ConfigDict(from_attributes=True)
+
+class DecisionCreate(BaseModel):
+    title: str
+
+
+class DecisionRead(BaseModel):
+    id: int
+    couple_id: int
+    created_by_id: int
+    title: str
+    status: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DecisionCandidateCreate(BaseModel):
+    content: str
+
+
+class DecisionCandidateRead(BaseModel):
+    id: int
+    decision_id: int
+    content: str
+    version: int
+    is_current: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DecisionApprovalRead(BaseModel):
+    id: int
+    candidate_id: int
+    user_id: int
+    approved: bool
+
+    model_config = ConfigDict(from_attributes=True)
