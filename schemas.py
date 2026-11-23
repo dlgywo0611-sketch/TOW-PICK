@@ -58,6 +58,26 @@ class DecisionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class DecisionMemberApprovalRead(BaseModel):
+    user_id: int
+    approved: bool
+
+
+class DecisionCandidateStatusRead(BaseModel):
+    id: int
+    decision_id: int
+    content: str
+    version: int
+    is_current: bool
+    approval_count: int
+    member_approvals: list[DecisionMemberApprovalRead]
+
+
+class DecisionDetailRead(DecisionRead):
+    current_candidate: DecisionCandidateStatusRead | None
+    confirmed: bool
+
+
 class DecisionCandidateCreate(BaseModel):
     content: str
 
