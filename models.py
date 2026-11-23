@@ -36,6 +36,7 @@ class User(Base):
         index=True,
     )
     nickname: Mapped[str] = mapped_column(String(50))
+    hashed_password: Mapped[str] = mapped_column(String(255))
     couple_id: Mapped[int | None] = mapped_column(
         ForeignKey("couples.id"),
         nullable=True,

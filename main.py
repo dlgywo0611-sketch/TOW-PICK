@@ -8,12 +8,19 @@ import models
 import schemas
 from database import Base, engine, get_db
 
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jwt.exceptions import InvalidTokenError
+
+from auth import create_access_token, decode_access_token, hash_password, verify_password
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="TOW-PICK API",
     description="HEART BRIDGE 백엔드 API",
 )
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 def get_user_or_404(db: Session, user_id: int) -> models.User:
@@ -66,9 +73,10 @@ def create_user(
         )
 
     new_user = models.User(
-        email=user.email,
-        nickname=user.nickname,
-    )
+    email=user.email,
+    nickname=user.nickname,
+    hashed_password=hash_password(user.password),
+)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -79,6 +87,59 @@ def create_user(
 def read_users(db: Session = Depends(get_db)):
     return list(db.scalars(select(models.User)).all())
 
+@app.post("/token", response_model=schemas.Token)
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    user = db.scalar(
+        select(models.User).where(
+            models.User.email == form_data.username
+        )
+    )
+
+    if user is None or not verify_password(
+        form_data.password,
+        user.hashed_password,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return schemas.Token(
+        access_token=create_access_token(str(user.id)),
+        token_type="bearer",
+    )
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> models.User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        user_id = int(decode_access_token(token))
+    except (InvalidTokenError, ValueError) as error:
+        raise credentials_exception from error
+
+    user = db.get(models.User, user_id)
+    if user is None:
+        raise credentials_exception
+
+    return user
+
+
+@app.get("/users/me", response_model=schemas.UserRead)
+def read_current_user(
+    current_user: models.User = Depends(get_current_user),
+):
+    return current_user
 
 @app.post(
     "/couples",

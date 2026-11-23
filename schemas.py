@@ -14,13 +14,21 @@ class MessageRead(MessageCreate):
 class UserCreate(BaseModel):
     email: str
     nickname: str
+    password: str
 
 
-class UserRead(UserCreate):
+class UserRead(BaseModel):
     id: int
+    email: str
+    nickname: str
     couple_id: int | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 
 class CoupleCreate(BaseModel):
