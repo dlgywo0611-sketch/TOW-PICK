@@ -289,6 +289,183 @@ def read_my_couple(
 
     return couple
 
+@app.post(
+    "/decisions",
+    response_model=schemas.DecisionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_decision(
+    request: schemas.DecisionCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not belong to a couple",
+        )
+
+    decision = models.Decision(
+        couple_id=current_user.couple_id,
+        created_by_id=current_user.id,
+        title=request.title,
+        status="open",
+    )
+
+    db.add(decision)
+    db.commit()
+    db.refresh(decision)
+
+    return decision
+
+@app.post(
+    "/decisions/{decision_id}/candidates",
+    response_model=schemas.DecisionCandidateRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_decision_candidate(
+    decision_id: int,
+    request: schemas.DecisionCandidateCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    decision = db.get(models.Decision, decision_id)
+
+    if decision is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Decision not found",
+        )
+
+    if decision.couple_id != current_user.couple_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot access this decision",
+        )
+
+    if decision.status != "open":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Decision is already closed",
+        )
+
+    current_candidate = db.scalar(
+        select(models.DecisionCandidate)
+        .where(
+            models.DecisionCandidate.decision_id == decision_id,
+            models.DecisionCandidate.is_current.is_(True),
+        )
+        .order_by(models.DecisionCandidate.version.desc())
+    )
+
+    next_version = 1
+
+    if current_candidate is not None:
+        current_candidate.is_current = False
+        next_version = current_candidate.version + 1
+
+    candidate = models.DecisionCandidate(
+        decision_id=decision_id,
+        content=request.content,
+        version=next_version,
+        is_current=True,
+    )
+
+    db.add(candidate)
+    db.commit()
+    db.refresh(candidate)
+
+    return candidate
+
+@app.post(
+    "/candidates/{candidate_id}/approve",
+    response_model=schemas.DecisionApprovalRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def approve_candidate(
+    candidate_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    candidate = db.get(models.DecisionCandidate, candidate_id)
+
+    if candidate is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate not found",
+        )
+
+    decision = db.get(models.Decision, candidate.decision_id)
+
+    if decision is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Decision not found",
+        )
+
+    if decision.couple_id != current_user.couple_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot access this decision",
+        )
+
+    if decision.status != "open":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Decision is already closed",
+        )
+
+    if not candidate.is_current:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only the current candidate can be approved",
+        )
+
+    existing_approval = db.scalar(
+        select(models.DecisionApproval).where(
+            models.DecisionApproval.candidate_id == candidate_id,
+            models.DecisionApproval.user_id == current_user.id,
+        )
+    )
+
+    if existing_approval is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User already approved this candidate",
+        )
+
+    approval = models.DecisionApproval(
+        candidate_id=candidate_id,
+        user_id=current_user.id,
+        approved=True,
+    )
+
+    db.add(approval)
+    db.flush()
+
+    approvals = db.scalars(
+        select(models.DecisionApproval).where(
+            models.DecisionApproval.candidate_id == candidate_id,
+            models.DecisionApproval.approved.is_(True),
+        )
+    ).all()
+
+    couple = get_couple_with_members(
+        db,
+        decision.couple_id,
+    )
+
+    if (
+        couple is not None
+        and len(couple.members) == 2
+        and len({item.user_id for item in approvals}) == 2
+    ):
+        decision.status = "confirmed"
+
+    db.commit()
+    db.refresh(approval)
+
+    return approval
 
 @app.post("/messages", response_model=schemas.MessageRead)
 def create_message(
