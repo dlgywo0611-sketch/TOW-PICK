@@ -51,6 +51,82 @@ def get_couple_with_members(
     )
 
 
+def get_decision_for_current_couple(
+    db: Session,
+    decision_id: int,
+    current_user: models.User,
+) -> models.Decision:
+    decision = db.get(models.Decision, decision_id)
+
+    if decision is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Decision not found",
+        )
+
+    if decision.couple_id != current_user.couple_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot access this decision",
+        )
+
+    return decision
+
+
+def build_decision_detail(
+    db: Session,
+    decision: models.Decision,
+) -> schemas.DecisionDetailRead:
+    current_candidate = db.scalar(
+        select(models.DecisionCandidate)
+        .where(
+            models.DecisionCandidate.decision_id == decision.id,
+            models.DecisionCandidate.is_current.is_(True),
+        )
+        .order_by(models.DecisionCandidate.version.desc())
+    )
+
+    candidate_status = None
+    if current_candidate is not None:
+        approved_user_ids = set(
+            db.scalars(
+                select(models.DecisionApproval.user_id).where(
+                    models.DecisionApproval.candidate_id
+                    == current_candidate.id,
+                    models.DecisionApproval.approved.is_(True),
+                )
+            ).all()
+        )
+        couple = get_couple_with_members(db, decision.couple_id)
+        members = [] if couple is None else couple.members
+
+        candidate_status = schemas.DecisionCandidateStatusRead(
+            id=current_candidate.id,
+            decision_id=current_candidate.decision_id,
+            content=current_candidate.content,
+            version=current_candidate.version,
+            is_current=current_candidate.is_current,
+            approval_count=len(approved_user_ids),
+            member_approvals=[
+                schemas.DecisionMemberApprovalRead(
+                    user_id=member.id,
+                    approved=member.id in approved_user_ids,
+                )
+                for member in sorted(members, key=lambda item: item.id)
+            ],
+        )
+
+    return schemas.DecisionDetailRead(
+        id=decision.id,
+        couple_id=decision.couple_id,
+        created_by_id=decision.created_by_id,
+        title=decision.title,
+        status=decision.status,
+        current_candidate=candidate_status,
+        confirmed=decision.status == "confirmed",
+    )
+
+
 @app.get("/")
 def root():
     return {"message": "TOW-PICK API is running"}
@@ -317,6 +393,51 @@ def create_decision(
     db.refresh(decision)
 
     return decision
+
+
+@app.get(
+    "/decisions",
+    response_model=list[schemas.DecisionRead],
+)
+def read_decisions(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not belong to a couple",
+        )
+
+    decisions = db.scalars(
+        select(models.Decision)
+        .where(models.Decision.couple_id == current_user.couple_id)
+        .order_by(models.Decision.id.desc())
+    )
+    return list(decisions.all())
+
+
+@app.get(
+    "/decisions/{decision_id}",
+    response_model=schemas.DecisionDetailRead,
+)
+def read_decision(
+    decision_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not belong to a couple",
+        )
+
+    decision = get_decision_for_current_couple(
+        db,
+        decision_id,
+        current_user,
+    )
+    return build_decision_detail(db, decision)
 
 @app.post(
     "/decisions/{decision_id}/candidates",
