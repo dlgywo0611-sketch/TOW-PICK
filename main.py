@@ -241,8 +241,19 @@ def read_couple(
 def create_message(
     message: schemas.MessageCreate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    new_message = models.Message(content=message.content)
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not belong to a couple",
+        )
+
+    new_message = models.Message(
+        content=message.content,
+        sender_id=current_user.id,
+        couple_id=current_user.couple_id,
+    )
     db.add(new_message)
     db.commit()
     db.refresh(new_message)
@@ -250,5 +261,21 @@ def create_message(
 
 
 @app.get("/messages", response_model=list[schemas.MessageRead])
-def read_messages(db: Session = Depends(get_db)):
-    return list(db.scalars(select(models.Message)).all())
+def read_messages(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not belong to a couple",
+        )
+
+    messages = db.scalars(
+        select(models.Message)
+        .where(
+            models.Message.couple_id == current_user.couple_id
+        )
+        .order_by(models.Message.id)
+    )
+    return list(messages.all())

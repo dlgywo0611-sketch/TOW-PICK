@@ -11,6 +11,11 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     content: Mapped[str] = mapped_column(String(500))
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    couple_id: Mapped[int] = mapped_column(
+        ForeignKey("couples.id"),
+        index=True,
+    )
 
 
 class Couple(Base):

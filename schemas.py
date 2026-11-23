@@ -7,7 +7,9 @@ class MessageCreate(BaseModel):
 
 class MessageRead(MessageCreate):
     id: int
-
+    sender_id: int
+    couple_id: int
+    
     model_config = ConfigDict(from_attributes=True)
 
 
