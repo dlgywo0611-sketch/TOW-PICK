@@ -83,10 +83,6 @@ def create_user(
     return new_user
 
 
-@app.get("/users", response_model=list[schemas.UserRead])
-def read_users(db: Session = Depends(get_db)):
-    return list(db.scalars(select(models.User)).all())
-
 @app.post("/token", response_model=schemas.Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -221,19 +217,30 @@ def join_couple(
 
 
 @app.get(
-    "/couples/{couple_id}",
+    "/couples/me",
     response_model=schemas.CoupleRead,
 )
-def read_couple(
-    couple_id: int,
+def read_my_couple(
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    couple = get_couple_with_members(db, couple_id)
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User does not belong to a couple",
+        )
+
+    couple = get_couple_with_members(
+        db,
+        current_user.couple_id,
+    )
+
     if couple is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Couple not found",
         )
+
     return couple
 
 
