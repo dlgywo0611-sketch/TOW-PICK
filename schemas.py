@@ -31,12 +31,7 @@ class Token(BaseModel):
     token_type: str
 
 
-class CoupleCreate(BaseModel):
-    user_id: int
-
-
 class CoupleJoin(BaseModel):
-    user_id: int
     invite_code: str
 
 

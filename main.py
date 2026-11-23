@@ -147,10 +147,10 @@ def read_current_user(
     status_code=status.HTTP_201_CREATED,
 )
 def create_couple(
-    request: schemas.CoupleCreate,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    user = get_user_or_404(db, request.user_id)
+    user = current_user
 
     if user.couple_id is not None:
         raise HTTPException(
@@ -183,8 +183,9 @@ def create_couple(
 def join_couple(
     request: schemas.CoupleJoin,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    user = get_user_or_404(db, request.user_id)
+    user = current_user
 
     if user.couple_id is not None:
         raise HTTPException(
