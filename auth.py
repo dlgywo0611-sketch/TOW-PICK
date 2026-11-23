@@ -1,4 +1,6 @@
+import hashlib
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -16,6 +18,10 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 password_hash = PasswordHash.recommended()
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def hash_password(password: str) -> str:
@@ -39,6 +45,7 @@ def create_access_token(subject: str) -> str:
     payload = {
         "sub": subject,
         "exp": expires_at,
+        "jti": secrets.token_hex(16),
     }
     return jwt.encode(
         payload,
@@ -59,3 +66,20 @@ def decode_access_token(token: str) -> str:
         raise InvalidTokenError("Token subject is missing")
 
     return subject
+
+def get_token_expiration(token: str) -> datetime:
+    payload = jwt.decode(
+        token,
+        SECRET_KEY,
+        algorithms=[ALGORITHM],
+    )
+
+    expires_at = payload.get("exp")
+
+    if not isinstance(expires_at, (int, float)):
+        raise InvalidTokenError("Token expiration is missing")
+
+    return datetime.fromtimestamp(
+        expires_at,
+        tz=timezone.utc,
+    )

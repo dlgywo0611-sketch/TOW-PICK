@@ -11,7 +11,14 @@ from database import Base, engine, get_db
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 
-from auth import create_access_token, decode_access_token, hash_password, verify_password
+from auth import (
+    create_access_token,
+    decode_access_token,
+    get_token_expiration,
+    hash_password,
+    hash_token,
+    verify_password,
+)
 
 Base.metadata.create_all(bind=engine)
 
@@ -73,10 +80,10 @@ def create_user(
         )
 
     new_user = models.User(
-    email=user.email,
-    nickname=user.nickname,
-    hashed_password=hash_password(user.password),
-)
+        email=user.email,
+        nickname=user.nickname,
+        hashed_password=hash_password(user.password),
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -109,6 +116,7 @@ def login(
         token_type="bearer",
     )
 
+
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
@@ -119,6 +127,18 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+    revoked_token = db.scalar(
+        select(models.RevokedToken).where(
+            models.RevokedToken.token_hash == hash_token(token)
+        )
+    )
+
+    if revoked_token is not None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
         user_id = int(decode_access_token(token))
     except (InvalidTokenError, ValueError) as error:
@@ -136,6 +156,32 @@ def read_current_user(
     current_user: models.User = Depends(get_current_user),
 ):
     return current_user
+
+
+@app.post("/logout")
+def logout(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    token_hash = hash_token(token)
+
+    existing_token = db.scalar(
+        select(models.RevokedToken).where(
+            models.RevokedToken.token_hash == token_hash
+        )
+    )
+
+    if existing_token is None:
+        revoked_token = models.RevokedToken(
+            token_hash=token_hash,
+            expires_at=get_token_expiration(token),
+        )
+        db.add(revoked_token)
+        db.commit()
+
+    return {"message": "Successfully logged out"}
+
 
 @app.post(
     "/couples",
