@@ -24,7 +24,15 @@ const elements = {
   connectedCode: document.querySelector('#connected-code'),
   memberA: document.querySelector('#member-a'),
   memberB: document.querySelector('#member-b'),
+  connectUsb: document.querySelector('#connect-usb'),
+  connectBle: document.querySelector('#connect-ble'),
+  petdockStatus: document.querySelector('#petdock-status'),
+  petEvent: document.querySelector('#pet-event'),
+  ledControls: document.querySelector('#led-controls'),
 };
+
+const petDock = new PetDockBridge();
+const deviceState = { usb: false, ble: false };
 
 const errorMessages = {
   'Incorrect email or password': '이메일 또는 비밀번호가 올바르지 않습니다.',
@@ -45,6 +53,20 @@ function showAlert(message, success = false) {
 
 function hideAlert() {
   elements.alert.classList.add('hidden');
+}
+
+function renderDeviceState() {
+  const connected = deviceState.usb || deviceState.ble;
+  const labels = [deviceState.usb && 'USB', deviceState.ble && 'BLE'].filter(Boolean);
+  elements.petdockStatus.classList.toggle('online', connected);
+  elements.petdockStatus.innerHTML = `<i></i> ${connected ? `${labels.join(' + ')} 연결됨` : '연결 대기'}`;
+  elements.connectUsb.textContent = deviceState.usb ? 'USB 연결됨' : 'USB 연결';
+  elements.connectUsb.disabled = deviceState.usb;
+  elements.connectBle.textContent = deviceState.ble ? '블루투스 연결됨' : '블루투스 연결';
+  elements.connectBle.disabled = deviceState.ble;
+  elements.ledControls.querySelectorAll('button').forEach((button) => {
+    button.disabled = !deviceState.ble;
+  });
 }
 
 function setButtonBusy(button, busy, label) {
@@ -217,4 +239,65 @@ elements.logoutButton.addEventListener('click', async () => {
   showAlert('로그아웃되었습니다.', true);
 });
 
+elements.connectUsb.addEventListener('click', async () => {
+  hideAlert();
+  setButtonBusy(elements.connectUsb, true, '연결 중…');
+  try {
+    await petDock.connectUsb();
+    showAlert('Arduino USB가 연결되었습니다.', true);
+  } catch (error) {
+    showAlert(error.message);
+  } finally {
+    if (!deviceState.usb) setButtonBusy(elements.connectUsb, false, '');
+  }
+});
+
+elements.connectBle.addEventListener('click', async () => {
+  hideAlert();
+  setButtonBusy(elements.connectBle, true, '검색 중…');
+  try {
+    await petDock.connectBluetooth();
+    showAlert('Meem 블루투스가 연결되었습니다.', true);
+  } catch (error) {
+    showAlert(error.message);
+  } finally {
+    if (!deviceState.ble) setButtonBusy(elements.connectBle, false, '');
+  }
+});
+
+elements.ledControls.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-led]');
+  if (!button) return;
+  hideAlert();
+  try {
+    await petDock.setLed(button.dataset.led);
+  } catch (error) {
+    showAlert(error.message);
+  }
+});
+
+petDock.addEventListener('usbstate', (event) => {
+  deviceState.usb = event.detail.connected;
+  renderDeviceState();
+});
+
+petDock.addEventListener('blestate', (event) => {
+  deviceState.ble = event.detail.connected;
+  renderDeviceState();
+});
+
+petDock.addEventListener('button', (event) => {
+  elements.petEvent.textContent = event.detail.button === 'A'
+    ? '펫 반응 요청 (버튼 A)'
+    : '펫 상태 확인 (버튼 B)';
+});
+
+petDock.addEventListener('led', (event) => {
+  const colorNames = { red: '빨강', green: '초록', blue: '파랑', off: '꺼짐' };
+  elements.petEvent.textContent = `LED 상태: ${colorNames[event.detail.color]}`;
+});
+
+petDock.addEventListener('error', (event) => showAlert(event.detail.message));
+
+renderDeviceState();
 loadCurrentSession();

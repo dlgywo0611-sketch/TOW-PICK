@@ -18,5 +18,15 @@ HEART BRIDGE 서로의 마음을 연결하는 AI 커플 소통 플랫폼
 - 상대방 초대 코드로 커플 참여
 - 연결된 커플 구성원 표시
 - 로그아웃 및 브라우저 세션 정리
+- Arduino USB 버튼 `BTN_A` / `BTN_B` 이벤트 표시
+- KEYES BLE `Meem` 연결 및 RGB LED 제어 (`R` / `G` / `B` / `X`)
 
-개인 조건, 추천, 공동 승인, BLE 화면은 다음 WBS에서 API 계약과 함께 연결합니다.
+개인 조건, 추천, 공동 승인은 다음 WBS에서 API 계약과 함께 연결합니다.
+
+## PET DOCK 사용 조건
+
+- Windows Chrome/Edge에서 `localhost` 또는 HTTPS로 접속합니다.
+- Arduino USB 시리얼은 9600 baud이며, 연결 전 Arduino IDE 시리얼 모니터를 닫습니다.
+- BLE 광고명은 `Meem`, 서비스는 `FFE0`, 특성은 `FFE1`입니다.
+- USB 버튼은 펫 반응/상태 표시 전용이며 커플 투표나 공동 승인 API를 호출하지 않습니다.
+- BLE 버튼 Notify는 하드웨어 RXD 전압 검증 전이므로 아직 지원하지 않습니다.
