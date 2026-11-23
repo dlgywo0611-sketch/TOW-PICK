@@ -1,6 +1,9 @@
 import secrets
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -25,6 +28,13 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="TOW-PICK API",
     description="HEART BRIDGE 백엔드 API",
+)
+
+FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
+app.mount(
+    "/static",
+    StaticFiles(directory=FRONTEND_DIR),
+    name="static",
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -54,6 +64,11 @@ def get_couple_with_members(
 @app.get("/")
 def root():
     return {"message": "TOW-PICK API is running"}
+
+
+@app.get("/app", include_in_schema=False)
+def web_app():
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 @app.get("/health")
