@@ -629,6 +629,31 @@ def create_decision_candidate(
             detail="Decision is already closed",
         )
 
+    couple = get_couple_with_members(db, decision.couple_id)
+    member_ids = (
+        set()
+        if couple is None
+        else {member.id for member in couple.members}
+    )
+    submitted_user_ids = set(
+        db.scalars(
+            select(models.DecisionCondition.user_id).where(
+                models.DecisionCondition.decision_id == decision.id,
+                models.DecisionCondition.user_id.in_(member_ids),
+            )
+        ).all()
+    )
+    if len(member_ids) != 2 or not member_ids.issubset(
+        submitted_user_ids
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Both couple members must submit conditions before "
+                "candidate creation"
+            ),
+        )
+
     current_candidate = db.scalar(
         select(models.DecisionCandidate)
         .where(

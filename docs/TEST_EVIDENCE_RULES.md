@@ -140,7 +140,7 @@ workflow 캔버스가 존재하는 것만으로 PASS 처리하지 않는다. 실
 |---|---|---|---|---|---|
 | P0-AUTH-01 | 회원가입 성공 | 새로운 이메일·닉네임·비밀번호로 `POST /users` | 201, `UserRead`, `couple_id=null` | 자동 테스트 또는 HTTP 요청/응답 | NOT TESTED — 구현·UI 존재, 전용 테스트 없음 |
 | P0-AUTH-02 | 중복 이메일 | 같은 이메일로 회원가입 2회 | 두 번째 요청 409 `Email already registered` | 자동 테스트와 DB unique 확인 | NOT TESTED |
-| P0-AUTH-03 | 로그인 성공 | 올바른 계정으로 `POST /token` | 200, bearer JWT 발급 | 토큰을 마스킹한 HTTP 로그 | NOT TESTED — 코드·UI 존재 |
+| P0-AUTH-03 | 로그인 성공 | 올바른 계정으로 `POST /token` | 200, bearer JWT 발급 | 토큰을 마스킹한 HTTP 로그 | PASS — 개인 조건 API 테스트가 A/B·타 커플·미가입 사용자 토큰을 실제 로그인 endpoint로 발급하고 보호 API에 사용 |
 | P0-AUTH-04 | 로그인 실패 | 잘못된 비밀번호 사용 | 401 `Incorrect email or password` | 자동 테스트 또는 오류 화면 | NOT TESTED |
 | P0-AUTH-05 | 로그아웃 후 토큰 차단 | 로그인→`POST /logout`→같은 토큰으로 보호 API 호출 | 로그아웃 200, 이후 401 `Token has been revoked` | 자동 테스트와 폐기 토큰 DB 확인 | NOT TESTED |
 
@@ -161,15 +161,15 @@ workflow 캔버스가 존재하는 것만으로 PASS 처리하지 않는다. 실
 | ID | 시나리오 | 실행 절차 | 예상 결과 | 최소 증빙 | 현재 테스트 상태 |
 |---|---|---|---|---|---|
 | P0-DEC-01 | Decision 생성 | 커플 사용자가 `POST /decisions` | 201, `status=open`, 서버가 couple/user 지정 | 자동 테스트 또는 HTTP 로그 | NOT TESTED — endpoint 구현 |
-| P0-DEC-02 | Candidate v1 생성 | 열린 Decision에 첫 Candidate 생성 | 201, `version=1`, `is_current=true` | 자동 테스트와 DB 상태 | PARTIAL — 첫 생성의 201은 검증하지만 `version=1`과 최초 `is_current=true`를 모두 직접 assert하지 않음. 전용 테스트 필요 |
-| P0-DEC-03 | Candidate v2 및 v1 비활성화 | 같은 Decision에 두 번째 Candidate 생성 | v2 current, v1 `is_current=false` | 자동 테스트와 두 Candidate 상태 | PASS — `test_latest_candidate_and_approval_state_until_confirmed` |
+| P0-DEC-02 | Candidate v1 생성 | 두 커플 구성원이 조건을 제출한 열린 Decision에 첫 Candidate 생성 | 201, `version=1`, `is_current=true` | 자동 테스트와 DB 상태 | PASS — JWT 기반 조건 선행 흐름에서 세 값을 직접 검증 |
+| P0-DEC-03 | Candidate v2 및 v1 비활성화 | 두 조건이 제출된 같은 Decision에 두 번째 Candidate 생성 | v2 `version=2`·current, v1 `is_current=false` | 자동 테스트와 두 Candidate 상태 | PASS — 기존 상세 테스트와 JWT 기반 회귀 테스트가 검증 |
 | P0-DEC-04 | 최신 Candidate 승인 | current Candidate를 A가 승인 | 201, A의 승인 행 생성 | 자동 테스트와 상세 조회 | PASS — 기존 테스트 흐름에서 실행 |
 | P0-DEC-05 | A만 승인 시 미확정 | A 승인 후 상세 조회 | `approval_count=1`, `confirmed=false` | 자동 테스트 결과 | PASS — 기존 테스트가 직접 검증 |
 | P0-DEC-06 | A/B 승인 시 confirmed | B가 같은 current Candidate 승인 후 상세 조회 | 승인 2, `status=confirmed`, `confirmed=true` | 자동 테스트 결과 | PASS — 기존 테스트가 직접 검증 |
 | P0-DEC-07 | 구버전 승인 차단 | v2 생성 후 v1 승인 | 409 `Only the current candidate can be approved` | 부정 자동 테스트와 응답 | NOT TESTED — 코드만 존재 |
 | P0-DEC-08 | 중복 승인 차단 | 같은 사용자가 같은 Candidate를 2회 승인 | 두 번째 요청 409 | 부정 자동 테스트와 DB 승인 1건 확인 | NOT TESTED — 코드·unique 존재 |
 | P0-DEC-09 | confirmed 후 재승인 차단 | 확정된 Decision의 Candidate 재승인 | 409 `Decision is already closed` | 부정 자동 테스트와 상태 유지 확인 | NOT TESTED — 코드만 존재 |
-| P0-DEC-10 | 타 커플 접근 차단 | 다른 커플이 목록·상세·후보 생성·승인 시도 | 데이터 미노출, 단건 접근 403 | endpoint별 권한 자동 테스트 | PARTIAL — 목록·상세는 테스트됨, 후보 생성·승인은 미검증 |
+| P0-DEC-10 | 타 커플 접근 차단 | 다른 커플이 목록·상세·후보 생성·승인 시도 | 데이터 미노출, 단건 접근 403 | endpoint별 권한 자동 테스트 | PARTIAL — 목록·상세와 JWT 기반 후보 생성 차단은 테스트됨, 타 커플 승인 시도는 미검증 |
 | P0-DEC-11 | 후보 없는 Decision 상세 | Candidate 없는 Decision 조회 | 200, `current_candidate=null`, `confirmed=false` | 자동 테스트 결과 | PASS |
 | P0-DEC-12 | 동시 승인 원자성 | A/B가 거의 동시에 같은 Candidate 승인 | 승인 2건이면 최종 상태가 반드시 confirmed | 동시 요청 테스트와 DB 상태 | NOT TESTED — backend 보강 필요 |
 | P0-DEC-13 | 동시 Candidate 버전 생성 | 같은 Decision에 동시에 후보 생성 | version 중복·복수 current 없이 한 요청씩 일관 처리 | 동시 요청 테스트와 DB constraint 확인 | NOT TESTED — backend 보강 필요 |
@@ -186,10 +186,11 @@ workflow 캔버스가 존재하는 것만으로 PASS 처리하지 않는다. 실
 | P0-COND-04 | 타 커플 접근 차단 | PUT/GET/status 모두 403 | endpoint별 부정 자동 테스트 | PASS |
 | P0-COND-05 | 인증·입력·ID 조작 차단 | 무인증 401, 잘못된 값과 `user_id`/`couple_id` 추가 422 | 자동 테스트 | PASS |
 | P0-COND-06 | 반복 PUT 수정 | 동일 `(decision_id, user_id)` 행 1건을 갱신 | DB row count assertion | PASS |
-| P0-COND-07 | Candidate 생성 후 변경 차단 | 기존·신규 조건 PUT 모두 409, 저장값 유지 | Candidate 생성 후 자동 테스트 | PASS |
-| P0-COND-08 | 조건 기반 추천 | 두 사용자 조건으로 후보 자동 생성 | 추천 API/알고리즘 증빙 | NOT TESTED — 이번 WBS 제외, 미구현 |
+| P0-COND-07 | 한 명만 조건 제출 후 Candidate 생성 차단 | A만 제출한 상태의 Candidate POST는 409 | JWT 기반 자동 테스트와 오류 응답 | PASS |
+| P0-COND-08 | 양측 제출 후 생성·조건 잠금 | A/B 제출 뒤 Candidate는 201이고 이후 A/B 조건 PUT은 모두 409 | JWT 기반 자동 테스트 | PASS |
+| P0-COND-09 | 조건 기반 추천 | 두 사용자 조건으로 후보 자동 생성 | 추천 API/알고리즘 증빙 | NOT TESTED — 이번 WBS 제외, 미구현 |
 
-2026-11-24 `feature/p0-private-conditions-20261124`에서 신규 8개와 기존 6개, 총 14개 Python 자동 테스트를 실행해 모두 통과했다. 브라우저 UI 통합과 동시 PUT 경쟁 테스트는 수행하지 않았으므로 각각 NOT TESTED로 유지한다.
+2026-11-24 `feature/p0-private-conditions-20261124`에서 개인 조건·Candidate 선행 조건 테스트 9개와 기존 Decision 조회·승인 테스트 6개, 총 15개 Python 자동 테스트를 실행해 모두 통과했다. A/B와 타 커플 접근 테스트는 `POST /token`으로 발급한 실제 JWT를 사용한다. 브라우저 UI 통합, 동시 조건 PUT, 동시 Candidate 생성 경쟁 테스트는 수행하지 않았으므로 NOT TESTED로 유지한다.
 
 ### 3.5 프론트엔드·백엔드 통합
 
@@ -368,13 +369,13 @@ WBS 1.2.7의 담당자는 이효재다.
 | 구버전 승인 차단 | implemented | NOT TESTED | backend 분기 존재, 직접 테스트 없음 | 부정 자동 테스트 |
 | 중복 승인 차단 | partial | NOT TESTED | 조회·unique 존재, 동시성 미검증 | 순차·동시 중복 테스트 |
 | confirmed 후 재승인 차단 | implemented | NOT TESTED | backend 분기 존재, 직접 테스트 없음 | 부정 자동 테스트 |
-| 타 커플 Decision 목록·상세 | implemented | PASS | 기존 자동 테스트 | 후보 생성·승인 권한은 별도 미검증 |
+| 타 커플 Decision 목록·상세·후보 생성 | implemented | PASS | 기존 자동 테스트와 실제 JWT 기반 Candidate 생성 차단 테스트 | 타 커플 승인 권한은 별도 미검증 |
 | PET DOCK USB 버튼 반복 테스트 | prototype / main 미통합 | PARTIAL | 성주연의 2026-11-23 실제 반복 시험 성공 기록 | 증빙 파일·외부 링크 manifest 등록 후 PASS 전환 |
 | PET DOCK Web Serial 수신 | prototype / main 미통합 | PARTIAL | 성주연의 2026-11-23 실제 반복 시험 성공 기록 | 반복 횟수·성공/실패 횟수와 공유 경로 등록 |
 | BLE Meem FFE0/FFE1 연결·LED 반복 테스트 | prototype / main 미통합 | PARTIAL | 성주연의 2026-11-23 실제 반복 시험 성공 기록 | 사진·영상·통신 결과 경로 등록 후 PASS 전환 |
 | BLE Notify 버튼 | not implemented | NOT TESTED | 미완료로 문서화 | 구현 후 실물 반복 테스트 |
 | PET DOCK이 승인을 만들지 않음 | architecture boundary | NOT TESTED | 설계와 prototype 코드에는 승인 호출 없음 | main 통합 후 부정 통합 테스트 |
-| 개인 비공개 조건 API | implemented | PASS | `tests/test_private_conditions.py`, 신규 8개 테스트 | 브라우저 UI·동시 PUT은 별도 검증 |
+| 개인 비공개 조건 API | implemented | PASS | `tests/test_private_conditions.py`, 개인 조건·Candidate 선행 조건 9개 테스트 | 브라우저 UI·동시 PUT은 별도 검증 |
 | 두 사용자 조건 기반 추천 | planned | NOT TESTED | 추천 모델/API 없음 | 다음 P0 단계에서 구현·검증 |
 | OUR PET·경험치 | planned | NOT TESTED | 모델/API 없음 | 중복 지급 포함 구현·테스트 |
 | CARE 일정·n8n 알림 | planned | NOT TESTED | 구현·실행 증빙 없음 | 일정 등록, trigger, 실제 알림, 중복 테스트 |

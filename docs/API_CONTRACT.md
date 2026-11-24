@@ -401,7 +401,8 @@ current 후보와 한 명의 승인이 있을 때:
 - `preferences`, `avoidances`는 각각 최대 1,000자이며 빈 문자열을 허용한다.
 - 같은 사용자가 같은 Decision에 다시 PUT하면 기존 행을 수정한다.
 - `user_id`, `couple_id`, `decision_id`는 Body로 받지 않는다. 추가 필드는 422로 거부하며 소유권은 JWT에서 결정한다.
-- Candidate가 하나라도 생성된 뒤에는 조건의 최초 저장과 수정을 모두 409 `Conditions cannot be changed after candidate creation`으로 차단한다. 현재 Candidate 생성 API는 조건 제출 완료를 강제하지 않으므로 프론트는 반드시 두 사용자의 제출 완료 후 후보 생성을 요청해야 한다.
+- Candidate가 하나라도 생성된 뒤에는 조건의 최초 저장과 수정을 모두 409 `Conditions cannot be changed after candidate creation`으로 차단한다.
+- Candidate 생성 API도 커플 구성원 두 명의 조건 제출을 서버에서 검증한다. 따라서 정상 흐름에서는 두 사용자가 모두 조건을 저장하기 전에 Candidate가 생겨 한쪽의 최초 입력이 잠기는 상태가 발생하지 않는다.
 - confirmed Decision은 409 `Decision is already closed`다.
 
 #### 내 조건 조회 — `GET /decisions/{decision_id}/conditions/me`
@@ -446,7 +447,7 @@ current 후보와 한 명의 승인이 있을 때:
 
 | Method | Path | Auth | Request | Success | 주요 Error |
 |---|---|---|---|---|---|
-| POST | `/decisions/{decision_id}/candidates` | Bearer | JSON `DecisionCandidateCreate` | 201 `DecisionCandidateRead` | 401, 403 타 커플, 404 Decision 없음, 409 닫힘, 422 |
+| POST | `/decisions/{decision_id}/candidates` | Bearer | JSON `DecisionCandidateCreate` | 201 `DecisionCandidateRead` | 401, 403 타 커플, 404 Decision 없음, 409 조건 미제출·닫힘, 422 |
 | POST | `/candidates/{candidate_id}/approve` | Bearer | 없음 | 201 `DecisionApprovalRead` | 401, 403 타 커플, 404 Candidate·Decision 없음, 409 닫힘·구버전·중복, 422 |
 
 ### 5.1 Candidate 생성 — `POST /decisions/{decision_id}/candidates`
@@ -475,8 +476,13 @@ current 후보와 한 명의 승인이 있을 때:
 
 - 404 `Decision not found`
 - 403 `You cannot access this decision`
+- 409 `Both couple members must submit conditions before candidate creation`: 커플이 두 명으로 연결되지 않았거나 두 구성원 중 한 명 이상이 해당 Decision의 조건을 제출하지 않음
 - 409 `Decision is already closed`
 - 422 Body 누락, `content` 누락 또는 잘못된 path parameter
+
+서버는 Candidate를 만들기 전에 현재 Decision 소유 Couple의 구성원이 정확히 두 명인지 확인하고, 두 구성원 ID 모두에 해당하는 `DecisionCondition` 행이 있는지 검증한다. 두 조건이 모두 있으면 기존과 같이 첫 후보는 `version=1`, 이후 후보는 version을 증가시키며 이전 후보를 non-current로 바꾼다. Candidate가 생성된 뒤에는 두 사용자의 조건 PUT이 모두 잠긴다.
+
+기존 데이터에 조건 없이 생성된 Candidate가 있는 경우 기존 Candidate와 승인 이력은 삭제하거나 변경하지 않으며 조회와 현재 후보 승인은 계속 허용한다. 다만 새 Candidate version 생성은 409로 차단한다. 조건 PUT도 기존 Candidate 잠금 정책에 따라 409이므로, 해당 레거시 Decision을 계속 사용하려면 운영자가 백업 후 두 구성원의 조건 행을 검증·보완하는 별도 데이터 이관 절차가 필요하다. API가 기존 이력을 자동 초기화하거나 임의 조건을 생성하지 않는다.
 
 커플 미가입 사용자가 존재하는 다른 커플 Decision에 후보 생성을 시도하면 별도 미가입 검사 없이 커플 불일치로 403을 받는다.
 
@@ -516,7 +522,7 @@ Body 없이 호출한다. 승인 사용자 ID는 JWT에서 결정되며 클라�
 | 401 | 인증 실패 | Bearer 없음·오류·만료, 폐기 토큰, 잘못된 로그인 정보 |
 | 403 | 인증됐지만 커플 권한 없음 | 다른 커플 Decision의 상세·후보·승인 접근 |
 | 404 | 리소스 또는 연결 상태 없음 | 초대 코드, Couple, Decision, Candidate 없음 |
-| 409 | 현재 상태와 충돌 | 이미 커플 가입, 커플 정원 초과, 커플 미가입 Decision 요청, 닫힌 결정, 구버전·중복 승인 |
+| 409 | 현재 상태와 충돌 | 이미 커플 가입, 커플 정원 초과, 커플 미가입 Decision 요청, 조건 미제출 상태의 Candidate 생성, 닫힌 결정, 구버전·중복 승인 |
 | 422 | 요청 형식 검증 실패 | 필수 JSON/form 필드 누락, path integer 오류 |
 
 HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매핑 키이기도 하므로 백엔드 변경 시 프론트와 함께 갱신해야 한다.
