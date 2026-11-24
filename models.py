@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -63,4 +69,69 @@ class RevokedToken(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True)
+    )
+
+class Decision(Base):
+    __tablename__ = "decisions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    couple_id: Mapped[int] = mapped_column(
+        ForeignKey("couples.id"),
+        index=True,
+    )
+    created_by_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="open",
+    )
+
+class DecisionCandidate(Base):
+    __tablename__ = "decision_candidates"
+    __table_args__ = (
+        UniqueConstraint(
+            "decision_id",
+            "version",
+            name="uq_decision_candidate_version",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    decision_id: Mapped[int] = mapped_column(
+        ForeignKey("decisions.id"),
+        index=True,
+    )
+    content: Mapped[str] = mapped_column(String(500))
+    version: Mapped[int] = mapped_column(default=1)
+    is_current: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+    )
+
+
+class DecisionApproval(Base):
+    __tablename__ = "decision_approvals"
+    __table_args__ = (
+        UniqueConstraint(
+            "candidate_id",
+            "user_id",
+            name="uq_candidate_user_approval",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("decision_candidates.id"),
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        index=True,
+    )
+    approved: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
     )

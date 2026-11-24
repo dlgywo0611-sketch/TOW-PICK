@@ -22,6 +22,7 @@ button { cursor: pointer; }
 .api-badge { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid #acd0c1; border-radius: 999px; background: #edf8f3; color: var(--sage); font-size: 9px; font-weight: 900; letter-spacing: .05em; }
 .api-badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--sage); }
 .profile-button { border: 0; background: transparent; color: var(--ink); font-size: 12px; font-weight: 800; }
+.logout-label { padding-left: 10px; border-left: 1px solid var(--line); color: var(--muted); font-size: 10px; }
 .profile-button strong { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: white; }
 
 .shell { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 76px); }
@@ -80,6 +81,9 @@ button { cursor: pointer; }
 .couple-symbol span { width: 36px; height: 36px; margin-left: -4px; border: 2px solid var(--sage); background: #f7efe5; color: var(--ink); font-size: 10px; }
 .couple-symbol b { z-index: 2; width: 24px; height: 24px; background: var(--coral); font-size: 9px; }
 .connected-code { padding: 9px 12px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 8px; font: 700 13px Georgia, serif; letter-spacing: .07em; }
+.connected-actions { display: grid; gap: 7px; }
+.refresh-button { min-height: 32px; padding: 0 11px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 7px; background: rgba(255, 255, 255, .1); color: white; font-size: 9px; font-weight: 900; }
+.refresh-button:disabled { cursor: default; opacity: .65; }
 
 .petdock-panel { margin-top: 24px; padding: 27px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); box-shadow: 0 14px 36px rgba(48, 42, 31, .05); }
 .petdock-heading { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
@@ -124,7 +128,8 @@ button { cursor: pointer; }
   .or { height: 18px; }
   .card { padding: 27px 23px; }
   .connected-card { grid-template-columns: auto 1fr; }
-  .connected-code { grid-column: 1 / -1; width: 100%; text-align: center; }
+  .connected-actions { grid-column: 1 / -1; width: 100%; }
+  .connected-code { width: 100%; text-align: center; }
   .petdock-heading { display: block; }
   .petdock-heading .status-pill { margin-top: 13px; }
   .petdock-grid { grid-template-columns: 1fr; }
