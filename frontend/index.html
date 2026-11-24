@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="OURVERSE TWO PICK 커플 연결 웹 UI" />
+    <title>OURVERSE — TWO PICK</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/app" aria-label="OURVERSE 홈">
+        <span class="brand-mark">O</span>
+        <span>OURVERSE</span>
+      </a>
+      <div class="top-actions">
+        <span class="api-badge"><i></i> API CONNECTED</span>
+        <button id="logout-button" class="profile-button hidden" type="button" aria-label="로그아웃">
+          <span id="profile-name">사용자</span>
+          <span class="logout-label">로그아웃</span>
+          <strong id="profile-avatar">U</strong>
+        </button>
+      </div>
+    </header>
+
+    <main class="shell">
+      <aside class="sidebar">
+        <p class="eyebrow">TWO PICK</p>
+        <h1>함께 고르는<br />우리의 오늘</h1>
+        <nav aria-label="진행 단계">
+          <div class="step active"><span>01</span><strong>로그인</strong></div>
+          <div class="step" id="nav-couple"><span>02</span><strong>커플 연결</strong></div>
+          <div class="step disabled"><span>03</span><strong>조건 입력</strong></div>
+          <div class="step disabled"><span>04</span><strong>공동 결정</strong></div>
+        </nav>
+        <div class="privacy-note">
+          <i></i>
+          <p><strong>개인 조건은 안전하게</strong><br />상대에게는 제출 여부만 보여요.</p>
+        </div>
+      </aside>
+
+      <section class="content">
+        <div id="alert" class="alert hidden" role="status" aria-live="polite"></div>
+
+        <section id="auth-view" class="view">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow coral">STEP 01 · ACCOUNT</p>
+              <h2>우리의 공간에 들어와요.</h2>
+              <p>각자 자신의 계정으로 로그인해야 두 사람의 승인을 구분할 수 있어요.</p>
+            </div>
+            <span class="status-pill"><i></i> 로그인 전</span>
+          </header>
+
+          <div class="auth-grid">
+            <form id="login-form" class="card warm">
+              <span class="card-letter">A</span>
+              <p class="eyebrow">이미 계정이 있어요</p>
+              <h3>로그인</h3>
+              <label for="login-email">이메일</label>
+              <input id="login-email" name="email" type="email" autocomplete="username" required />
+              <label for="login-password">비밀번호</label>
+              <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+              <button class="primary-button dark" type="submit">로그인 <span>→</span></button>
+            </form>
+
+            <div class="or"><span>OR</span></div>
+
+            <form id="signup-form" class="card">
+              <span class="card-letter coral-letter">B</span>
+              <p class="eyebrow">처음 방문했어요</p>
+              <h3>회원가입</h3>
+              <label for="signup-nickname">닉네임</label>
+              <input id="signup-nickname" name="nickname" maxlength="50" required />
+              <label for="signup-email">이메일</label>
+              <input id="signup-email" name="email" type="email" autocomplete="email" required />
+              <label for="signup-password">비밀번호</label>
+              <input id="signup-password" name="password" type="password" minlength="8" autocomplete="new-password" required />
+              <button class="primary-button coral-button" type="submit">계정 만들기 <span>→</span></button>
+            </form>
+          </div>
+        </section>
+
+        <section id="couple-view" class="view hidden">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow coral">STEP 02 · COUPLE LINK</p>
+              <h2>두 사람을 연결해요.</h2>
+              <p>초대 코드를 주고받으면 둘만의 OURVERSE 공간이 시작됩니다.</p>
+            </div>
+            <span id="couple-status" class="status-pill"><i></i> 연결 전</span>
+          </header>
+
+          <div id="connection-actions" class="auth-grid">
+            <article class="card warm">
+              <span class="card-letter">A</span>
+              <p class="eyebrow">내가 초대할게요</p>
+              <h3>초대 코드 만들기</h3>
+              <p class="card-copy">새 커플 공간을 만들고 상대방에게 코드를 전달하세요.</p>
+              <div id="invite-code" class="code-box">아직 생성된 코드가 없어요.</div>
+              <button id="create-couple-button" class="primary-button dark" type="button">초대 코드 만들기 <span>→</span></button>
+            </article>
+
+            <div class="or"><span>OR</span></div>
+
+            <form id="join-form" class="card">
+              <span class="card-letter coral-letter">B</span>
+              <p class="eyebrow">초대를 받았어요</p>
+              <h3>상대방 코드 입력</h3>
+              <p class="card-copy">상대방이 보내준 8자리 코드를 입력해 주세요.</p>
+              <label for="join-code">초대 코드</label>
+              <input id="join-code" name="invite_code" maxlength="8" placeholder="예: A1B2C3D4" required />
+              <button class="primary-button coral-button" type="submit">커플 연결하기 <span>→</span></button>
+            </form>
+          </div>
+
+          <article id="connected-card" class="connected-card hidden">
+            <div class="couple-symbol"><span id="member-a">나</span><b>♥</b><span id="member-b">상대</span></div>
+            <div>
+              <p class="eyebrow">COUPLE SPACE READY</p>
+              <h3 id="connected-title">커플 연결이 완료됐어요.</h3>
+              <p>다음 단계에서는 두 사람이 각자의 비공개 조건을 입력하게 됩니다.</p>
+            </div>
+            <div class="connected-actions">
+              <span id="connected-code" class="connected-code"></span>
+              <button id="refresh-couple-button" class="refresh-button" type="button">연결 상태 새로고침</button>
+            </div>
+          </article>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>
