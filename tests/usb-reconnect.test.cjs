@@ -107,5 +107,43 @@ async function until(predicate, label) {
   await bridge.disconnectUsb();
   assert.deepEqual(states, [true, false, true, false, true, false]);
   assert.deepEqual(buttons, ['A', 'B', 'A', 'B']);
-  console.log('PASS: USB button input, unplug cleanup, reconnect, close failure cleanup, reconnect again');
+
+  // 6. Use actual characteristic properties to select the BLE write method.
+  const withoutResponseWrites = [];
+  bridge.bluetoothCharacteristic = {
+    properties: { writeWithoutResponse: true, write: true },
+    async writeValueWithoutResponse(payload) {
+      withoutResponseWrites.push(new TextDecoder().decode(payload));
+    },
+    async writeValueWithResponse() {
+      throw new Error('write with response must not be used');
+    },
+  };
+  for (const color of ['red', 'green', 'blue', 'off']) {
+    await bridge.setLed(color);
+  }
+  assert.deepEqual(withoutResponseWrites, ['R', 'G', 'B', 'X']);
+
+  // A method may exist even when the characteristic property disallows it.
+  const withResponseWrites = [];
+  bridge.bluetoothCharacteristic = {
+    properties: { writeWithoutResponse: false, write: true },
+    async writeValueWithoutResponse() {
+      throw new Error('unsupported writeWithoutResponse must not be used');
+    },
+    async writeValueWithResponse(payload) {
+      withResponseWrites.push(new TextDecoder().decode(payload));
+    },
+  };
+  await bridge.setLed('blue');
+  assert.deepEqual(withResponseWrites, ['B']);
+
+  bridge.bluetoothCharacteristic = {
+    properties: { writeWithoutResponse: false, write: false },
+    async writeValueWithoutResponse() {},
+    async writeValueWithResponse() {},
+  };
+  await assert.rejects(() => bridge.setLed('red'), /BLE 쓰기를 지원하지 않습니다/);
+
+  console.log('PASS: USB reconnect, BTN_A/BTN_B parsing, BLE capability selection, R/G/B/X writes');
 })().catch(error => { console.error(error); process.exitCode = 1; });

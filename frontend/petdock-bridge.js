@@ -149,8 +149,36 @@ class PetDockBridge extends EventTarget {
 
     const server = await this.bluetoothDevice.gatt.connect();
     const service = await server.getPrimaryService(PetDockBridge.BLE_SERVICE);
-    this.bluetoothCharacteristic = await service.getCharacteristic(PetDockBridge.BLE_CHARACTERISTIC);
+    const characteristic = await service.getCharacteristic(PetDockBridge.BLE_CHARACTERISTIC);
+    if (!this.getBleWriteMode(characteristic)) {
+      if (server.connected) server.disconnect();
+      throw new Error('Meem FFE1 특성이 BLE 쓰기를 지원하지 않습니다.');
+    }
+    this.bluetoothCharacteristic = characteristic;
     this.dispatchEvent(new CustomEvent('blestate', { detail: { connected: true } }));
+  }
+
+  getBleWriteMode(characteristic = this.bluetoothCharacteristic) {
+    const properties = characteristic?.properties;
+    if (
+      properties?.writeWithoutResponse
+      && typeof characteristic.writeValueWithoutResponse === 'function'
+    ) {
+      return 'without-response';
+    }
+    if (
+      properties?.write
+      && typeof characteristic.writeValueWithResponse === 'function'
+    ) {
+      return 'with-response';
+    }
+    if (
+      (properties?.write || properties?.writeWithoutResponse)
+      && typeof characteristic.writeValue === 'function'
+    ) {
+      return 'legacy';
+    }
+    return null;
   }
 
   async setLed(color) {
@@ -161,10 +189,15 @@ class PetDockBridge extends EventTarget {
     const command = commands[color];
     if (!command) throw new Error('지원하지 않는 LED 색상입니다.');
     const payload = new TextEncoder().encode(command);
-    if ('writeValueWithoutResponse' in this.bluetoothCharacteristic) {
+    const writeMode = this.getBleWriteMode();
+    if (writeMode === 'without-response') {
       await this.bluetoothCharacteristic.writeValueWithoutResponse(payload);
-    } else {
+    } else if (writeMode === 'with-response') {
+      await this.bluetoothCharacteristic.writeValueWithResponse(payload);
+    } else if (writeMode === 'legacy') {
       await this.bluetoothCharacteristic.writeValue(payload);
+    } else {
+      throw new Error('Meem FFE1 특성이 BLE 쓰기를 지원하지 않습니다.');
     }
     this.dispatchEvent(new CustomEvent('led', { detail: { color } }));
   }
