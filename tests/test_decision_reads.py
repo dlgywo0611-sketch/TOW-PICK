@@ -79,6 +79,27 @@ class DecisionReadApiTests(unittest.TestCase):
                 status="open",
             )
             db.add_all([decision, empty_decision, other_decision])
+            db.flush()
+            db.add_all(
+                [
+                    models.DecisionCondition(
+                        decision_id=decision.id,
+                        user_id=users[0].id,
+                        max_budget=50000,
+                        available_time="Saturday evening",
+                        preferences="quiet restaurant",
+                        avoidances="long waiting time",
+                    ),
+                    models.DecisionCondition(
+                        decision_id=decision.id,
+                        user_id=users[1].id,
+                        max_budget=40000,
+                        available_time="Saturday evening",
+                        preferences="nearby restaurant",
+                        avoidances="spicy food",
+                    ),
+                ]
+            )
             db.commit()
 
             self.user_a_id = users[0].id

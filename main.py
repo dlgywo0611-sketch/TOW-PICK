@@ -454,6 +454,150 @@ def read_decision(
     )
     return build_decision_detail(db, decision)
 
+
+@app.put(
+    "/decisions/{decision_id}/conditions/me",
+    response_model=schemas.DecisionConditionRead,
+)
+def upsert_my_decision_condition(
+    decision_id: int,
+    request: schemas.DecisionConditionUpsert,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not belong to a couple",
+        )
+
+    decision = get_decision_for_current_couple(
+        db,
+        decision_id,
+        current_user,
+    )
+
+    if decision.status != "open":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Decision is already closed",
+        )
+
+    candidate_id = db.scalar(
+        select(models.DecisionCandidate.id).where(
+            models.DecisionCandidate.decision_id == decision.id
+        )
+    )
+    if candidate_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Conditions cannot be changed after candidate creation",
+        )
+
+    condition = db.scalar(
+        select(models.DecisionCondition).where(
+            models.DecisionCondition.decision_id == decision.id,
+            models.DecisionCondition.user_id == current_user.id,
+        )
+    )
+
+    values = request.model_dump()
+    if condition is None:
+        condition = models.DecisionCondition(
+            decision_id=decision.id,
+            user_id=current_user.id,
+            **values,
+        )
+        db.add(condition)
+    else:
+        for field, value in values.items():
+            setattr(condition, field, value)
+
+    db.commit()
+    db.refresh(condition)
+    return condition
+
+
+@app.get(
+    "/decisions/{decision_id}/conditions/me",
+    response_model=schemas.DecisionConditionRead,
+)
+def read_my_decision_condition(
+    decision_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not belong to a couple",
+        )
+
+    decision = get_decision_for_current_couple(
+        db,
+        decision_id,
+        current_user,
+    )
+    condition = db.scalar(
+        select(models.DecisionCondition).where(
+            models.DecisionCondition.decision_id == decision.id,
+            models.DecisionCondition.user_id == current_user.id,
+        )
+    )
+    if condition is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conditions not found",
+        )
+    return condition
+
+
+@app.get(
+    "/decisions/{decision_id}/conditions/status",
+    response_model=schemas.DecisionConditionStatusRead,
+)
+def read_decision_condition_status(
+    decision_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not belong to a couple",
+        )
+
+    decision = get_decision_for_current_couple(
+        db,
+        decision_id,
+        current_user,
+    )
+    couple = get_couple_with_members(db, decision.couple_id)
+    members = [] if couple is None else couple.members
+    submitted_user_ids = set(
+        db.scalars(
+            select(models.DecisionCondition.user_id).where(
+                models.DecisionCondition.decision_id == decision.id
+            )
+        ).all()
+    )
+
+    member_conditions = [
+        schemas.DecisionConditionMemberStatusRead(
+            user_id=member.id,
+            submitted=member.id in submitted_user_ids,
+        )
+        for member in sorted(members, key=lambda item: item.id)
+    ]
+    return schemas.DecisionConditionStatusRead(
+        decision_id=decision.id,
+        submitted_count=sum(
+            item.submitted for item in member_conditions
+        ),
+        member_conditions=member_conditions,
+    )
+
+
 @app.post(
     "/decisions/{decision_id}/candidates",
     response_model=schemas.DecisionCandidateRead,
@@ -483,6 +627,31 @@ def create_decision_candidate(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Decision is already closed",
+        )
+
+    couple = get_couple_with_members(db, decision.couple_id)
+    member_ids = (
+        set()
+        if couple is None
+        else {member.id for member in couple.members}
+    )
+    submitted_user_ids = set(
+        db.scalars(
+            select(models.DecisionCondition.user_id).where(
+                models.DecisionCondition.decision_id == decision.id,
+                models.DecisionCondition.user_id.in_(member_ids),
+            )
+        ).all()
+    )
+    if len(member_ids) != 2 or not member_ids.issubset(
+        submitted_user_ids
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Both couple members must submit conditions before "
+                "candidate creation"
+            ),
         )
 
     current_candidate = db.scalar(

@@ -1,17 +1,22 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Integer,
     String,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class Message(Base):
@@ -88,6 +93,41 @@ class Decision(Base):
         String(20),
         default="open",
     )
+
+
+class DecisionCondition(Base):
+    __tablename__ = "decision_conditions"
+    __table_args__ = (
+        UniqueConstraint(
+            "decision_id",
+            "user_id",
+            name="uq_decision_condition_user",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    decision_id: Mapped[int] = mapped_column(
+        ForeignKey("decisions.id"),
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        index=True,
+    )
+    max_budget: Mapped[int] = mapped_column(Integer)
+    available_time: Mapped[str] = mapped_column(String(200))
+    preferences: Mapped[str] = mapped_column(String(1000))
+    avoidances: Mapped[str] = mapped_column(String(1000))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+    )
+
 
 class DecisionCandidate(Base):
     __tablename__ = "decision_candidates"

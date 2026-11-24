@@ -95,8 +95,8 @@ OURVERSE 3.0의 기획상 핵심 타깃은 다음 상황에 있는 연인 또는
 | 4. 코드로 참여 | 상대가 자신의 계정에서 초대 코드를 입력한다. | 코드를 조회하고 정원이 남아 있으면 같은 Couple에 연결한다. | 두 계정이 하나의 커플 공간에 속한다. | implemented |
 | 5. 커플 연결 확인 | 두 사용자가 연결 상태와 구성원을 확인한다. | `/couples/me`로 현재 커플과 구성원을 반환한다. | 올바른 상대와 연결됐음을 확인한다. | implemented |
 | 6. 공동결정 시작 | 한 사용자가 결정 주제와 제목을 입력한다. | `open` 상태 Decision을 현재 커플 소유로 생성한다. | 함께 결정할 주제가 공유된다. | partial — backend 구현, 현재 UI 미연결 |
-| 7. 각자 조건 입력 | A와 B가 취향, 예산, 시간 등 자신의 조건을 입력한다. | 조건을 사용자별로 저장하고 세부 조건을 상대에게 노출하지 않는다. | 조건은 반영되지만 원치 않는 세부 내용은 보호된다. | planned — 모델·API·UI 없음 |
-| 8. 후보 확인 | 두 사람의 조건을 반영한 후보를 확인한다. | 추천 또는 생성된 current Candidate와 version을 표시한다. | 어떤 조건의 결과인지 이해하고 비교한다. | partial — Candidate 수동 생성·상세 API만 존재, 추천·UI 없음 |
+| 7. 각자 조건 입력 | A와 B가 취향, 예산, 시간 등 자신의 조건을 입력한다. | 조건을 사용자별로 저장하고 세부 조건을 상대에게 노출하지 않는다. | 조건은 반영되지만 원치 않는 세부 내용은 보호된다. | partial — 모델·API·자동 테스트 구현, UI 없음 |
+| 8. 후보 확인 | 두 사람의 조건을 반영한 후보를 확인한다. | 두 구성원의 조건 제출을 확인한 뒤 current Candidate와 version을 생성·표시한다. 한 명이라도 미제출이면 생성을 409로 차단한다. | 어떤 조건의 결과인지 이해하고 비교한다. | partial — 조건 선행 검증과 Candidate 수동 생성·상세 API 존재, 추천·UI 없음 |
 | 9. 필요 시 후보 변경 | 조건이나 의견을 반영해 새 후보를 요청한다. | 이전 후보를 non-current로 바꾸고 version을 1 증가시킨다. | 최신 후보와 이전 후보가 구분된다. | partial — backend 버전 처리 존재, UI·동시성 보강 없음 |
 | 10. 최신 후보 독립 승인 | A와 B가 각자의 로그인 세션에서 동일한 current 후보를 승인한다. | 사용자별 DecisionApproval을 저장하고 구버전·중복 승인을 차단한다. | 상대를 대신하지 않고 내 의사를 직접 표시한다. | partial — backend 구현, 현재 UI 미연결 |
 | 11. 양측 승인 완료 | 두 번째 사용자가 아직 승인하지 않았다면 기다리고, 승인 후 상태를 갱신한다. | 상세 조회에서 구성원별 승인 상태와 `approval_count`를 반환한다. | 누가 아직 응답하지 않았는지 알 수 있다. | partial — backend 상태 조회 존재, 현재 UI 미연결 |
@@ -112,7 +112,7 @@ OURVERSE 3.0의 기획상 핵심 타깃은 다음 상황에 있는 연인 또는
 회원가입 → 로그인 → 초대 코드 생성/참여 → 커플 연결 확인 → 로그아웃
 ```
 
-Decision, Candidate, 승인 backend API는 존재하지만 현재 프론트엔드에서 호출하지 않는다. 개인 조건, 추천, 별도 최종 결정 기록, OUR PET 경험치, CARE 일정·알림은 아직 구현되지 않았다. 따라서 P0 전체 흐름을 실제 웹에서 끝까지 시연할 수 있는 상태는 아니다.
+Decision, Candidate, 승인과 개인별 비공개 조건 backend API는 존재하지만 현재 프론트엔드에서 호출하지 않는다. 조건 기반 추천, 별도 최종 결정 기록, OUR PET 경험치, CARE 일정·알림은 아직 구현되지 않았다. 따라서 P0 전체 흐름을 실제 웹에서 끝까지 시연할 수 있는 상태는 아니다.
 
 ## 5. 실패/예외 사용자 여정
 
@@ -126,6 +126,7 @@ Decision, Candidate, 승인 backend API는 존재하지만 현재 프론트엔�
 | 상대 커플의 Decision 접근 | URL의 Decision ID를 다른 커플 ID로 변경한다. | 403 `You cannot access this decision` | 접근을 중단하고 내 커플 목록으로 이동 | partial — backend 구현·일부 테스트, UI 없음 |
 | 존재하지 않는 Decision | 삭제됐거나 잘못된 ID를 조회한다. | 404 `Decision not found` | 목록을 새로고침하고 유효한 Decision 선택 | partial — backend 구현, UI 없음 |
 | 후보가 아직 없음 | Decision 상세를 열었지만 Candidate가 없다. | `current_candidate=null`, `confirmed=false` | 후보 생성 또는 추천 단계 안내 | partial — backend 응답, UI·추천 없음 |
+| 한 명만 조건을 제출한 상태에서 후보 생성 | 상대가 조건을 입력하기 전에 Candidate 생성을 요청한다. | 409 `Both couple members must submit conditions before candidate creation` | 제출 상태만 표시하고 상대의 조건 원문을 노출하지 않은 채 두 번째 제출을 기다림 | partial — backend 검증·자동 테스트 구현, UI 없음 |
 | 구버전 후보 승인 | 새 버전이 나온 뒤 이전 후보를 승인한다. | 409 `Only the current candidate can be approved` | 최신 상세를 다시 불러오고 current 후보 검토 | partial — backend 구현, UI·직접 자동 테스트 없음 |
 | 같은 후보 중복 승인 | 같은 계정이 승인 버튼을 다시 누른다. | 409 `User already approved this candidate` | 이미 승인됨을 표시하고 상세 상태 갱신 | partial — backend 순차 처리, UI·동시성 테스트 없음 |
 | 확정 후 추가 승인 | confirmed 상태에서 다시 승인한다. | 409 `Decision is already closed` | 확정 결과 화면으로 이동 | partial — backend 구현, UI·직접 자동 테스트 없음 |
