@@ -22,6 +22,7 @@ const elements = {
   connectedCard: document.querySelector('#connected-card'),
   connectedTitle: document.querySelector('#connected-title'),
   connectedCode: document.querySelector('#connected-code'),
+  refreshCoupleButton: document.querySelector('#refresh-couple-button'),
   memberA: document.querySelector('#member-a'),
   memberB: document.querySelector('#member-b'),
 };
@@ -94,6 +95,7 @@ function render() {
   if (!authenticated) return;
   elements.profileName.textContent = state.user.nickname;
   elements.profileAvatar.textContent = state.user.nickname.slice(0, 1).toUpperCase();
+  elements.logoutButton.setAttribute('aria-label', `${state.user.nickname}님 로그아웃`);
 
   const connected = Boolean(state.couple && state.couple.members.length >= 2);
   const hasCouple = Boolean(state.couple);
@@ -111,12 +113,17 @@ function render() {
     ? `${me.nickname}님과 ${partner.nickname}님이 연결됐어요.`
     : '초대 코드를 상대방에게 전달해 주세요.';
   elements.connectedCode.textContent = state.couple.invite_code;
+  elements.refreshCoupleButton.classList.toggle('hidden', connected);
 }
 
 async function loadCurrentSession() {
-  if (!state.token) return render();
+  if (!state.token) {
+    render();
+    return false;
+  }
   try {
     state.user = await api('/users/me');
+    state.couple = null;
     try {
       state.couple = await api('/couples/me');
     } catch (error) {
@@ -125,8 +132,11 @@ async function loadCurrentSession() {
   } catch (error) {
     clearSession();
     showAlert(error.message);
+    render();
+    return false;
   }
   render();
+  return true;
 }
 
 elements.loginForm.addEventListener('submit', async (event) => {
@@ -139,8 +149,8 @@ elements.loginForm.addEventListener('submit', async (event) => {
   try {
     const result = await api('/token', { method: 'POST', body });
     saveToken(result.access_token);
-    await loadCurrentSession();
-    showAlert('로그인되었습니다.', true);
+    const sessionLoaded = await loadCurrentSession();
+    if (sessionLoaded) showAlert('로그인되었습니다.', true);
   } catch (error) {
     showAlert(error.message);
   } finally {
@@ -202,6 +212,24 @@ elements.joinForm.addEventListener('submit', async (event) => {
     showAlert(error.message);
   } finally {
     setButtonBusy(button, false, '');
+  }
+});
+
+elements.refreshCoupleButton.addEventListener('click', async () => {
+  hideAlert();
+  setButtonBusy(elements.refreshCoupleButton, true, '확인 중…');
+  try {
+    state.couple = await api('/couples/me');
+    const connected = state.couple.members.length >= 2;
+    render();
+    showAlert(
+      connected ? '상대방 연결을 확인했습니다.' : '아직 상대방을 기다리고 있습니다.',
+      connected,
+    );
+  } catch (error) {
+    showAlert(error.message);
+  } finally {
+    setButtonBusy(elements.refreshCoupleButton, false, '');
   }
 });
 

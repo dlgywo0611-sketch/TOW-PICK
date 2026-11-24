@@ -16,8 +16,9 @@
       </a>
       <div class="top-actions">
         <span class="api-badge"><i></i> API CONNECTED</span>
-        <button id="logout-button" class="profile-button hidden" type="button">
+        <button id="logout-button" class="profile-button hidden" type="button" aria-label="로그아웃">
           <span id="profile-name">사용자</span>
+          <span class="logout-label">로그아웃</span>
           <strong id="profile-avatar">U</strong>
         </button>
       </div>
@@ -121,7 +122,10 @@
               <h3 id="connected-title">커플 연결이 완료됐어요.</h3>
               <p>다음 단계에서는 두 사람이 각자의 비공개 조건을 입력하게 됩니다.</p>
             </div>
-            <span id="connected-code" class="connected-code"></span>
+            <div class="connected-actions">
+              <span id="connected-code" class="connected-code"></span>
+              <button id="refresh-couple-button" class="refresh-button" type="button">연결 상태 새로고침</button>
+            </div>
           </article>
         </section>
       </section>
