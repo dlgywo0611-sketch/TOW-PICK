@@ -569,7 +569,7 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 | 커플 연결 새로고침 | `GET /couples/me` |
 | 로그아웃 | `POST /logout` |
 
-현재 `frontend/app.js`는 Decision, Candidate, 승인 API를 아직 호출하지 않는다. 백엔드 API는 구현되어 있으므로 공동결정 UI에서 이 문서의 계약에 맞춰 연결해야 한다.
+`frontend/app.js`는 인증·커플·PET DOCK 화면을 담당하고, 신규 `frontend/decision-flow.js`가 Decision·조건·추천·Candidate·승인 API를 호출한다. 실제 두 계정 브라우저 시연은 별도 검증이 필요하다.
 
 ### 구현 주의사항
 
@@ -593,7 +593,7 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 | 영역 | 상태 | 현재 계약 |
 |---|---|---|
 | 두 사용자 조건 기반 규칙형 추천 | implemented (P0 rules) | `POST /decisions/{decision_id}/recommendations` — 신규 후보 v1 생성, 가격·시간은 시연용 |
-| Candidate 자동 생성·추천 | planned | 현재 Candidate 수동 생성 API만 존재 |
+| Candidate 자동 생성·추천 | partial | 사용자 입력 시연용 옵션의 규칙형 추천 v1 생성 가능. 자동 실매장 검색/가격 확인/AI 추천은 미구현 |
 | 별도 최종 결정 기록 | planned | 현재는 `Decision.status`와 current Candidate만 사용 |
 | 만족도·간단 피드백 | planned | endpoint/schema 없음 |
 | OUR PET 상태·성장 | planned | endpoint/schema 없음 |
@@ -625,7 +625,7 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 - `frontend/app.js`의 실제 7개 API 경로, Body 형식, 토큰 저장·헤더 처리를 대조했다.
 - 현재 프론트가 호출하는 인증·커플 endpoint의 Method, Path, Body는 백엔드와 일치한다.
 - 공동결정 backend endpoint는 구현되어 있지만 현재 프론트에는 연결되지 않았다.
-- 개인 조건, 추천, OUR PET, 경험치, 일정, PET 이벤트 영속화는 UI 문구 또는 기획 범위와 달리 API가 없으므로 `planned`로 구분했다.
+- 개인 조건·규칙형 추천 API는 구현되어 있으며 프론트 연결 코드는 신규로 추가되었다. OUR PET, 경험치, 일정, PET 이벤트 영속화는 `planned`다. 브라우저 E2E 및 실가격 확인은 미검증이다.
 
 
 ## P0 규칙형 균형 추천 API

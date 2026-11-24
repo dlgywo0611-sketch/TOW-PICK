@@ -137,3 +137,49 @@ button { cursor: pointer; }
   .device-button { grid-column: 1 / -1; }
   .petdock-console { align-items: flex-start; flex-direction: column; }
 }
+
+/* TWO-PICK P0 decision workspace - scoped to the existing visual language. */
+.decision-workspace { margin-top: 26px; padding: 28px; border-radius: 16px; border: 1px solid var(--line); background: #fffefa; box-shadow: 0 14px 36px rgba(48, 42, 31, .05); }
+.decision-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.decision-heading h3 { margin: 0 0 10px; font: 500 27px Georgia, serif; }
+.decision-heading p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.decision-top-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; margin-bottom: 17px; }
+.decision-card { padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: #faf8f4; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.decision-card h4 { margin: 0 0 7px; font-size: 16px; font-weight: 800; }
+.decision-card label { color: #4c4842; font-size: 11px; font-weight: 700; }
+.decision-card input:not([type=checkbox]), .decision-card textarea { width: 100%; padding: 11px 12px; border: 1px solid #cec7bb; border-radius: 8px; background: white; color: var(--ink); font: 12px/1.5 Arial, sans-serif; }
+.decision-card input:not([type=checkbox]) { min-height: 41px; }
+.decision-card textarea { resize: vertical; min-height: 56px; }
+.decision-card input:focus, .decision-card textarea:focus { outline: 2px solid #f6b8a7; outline-offset: 1px; }
+.decision-card input:disabled, .decision-card textarea:disabled { background: #f0eee9; color: #6f6b65; }
+.decision-primary, .decision-secondary { border-radius: 8px; min-height: 40px; padding: 8px 15px; font-size: 11px; font-weight: 800; }
+.decision-primary { border: 1px solid var(--coral); background: var(--coral); color: white; }
+.decision-secondary { border: 1px solid #c6beb0; background: #fffefa; color: var(--ink); }
+.decision-primary:disabled, .decision-secondary:disabled { cursor: not-allowed; opacity: .5; }
+.decision-card > button:last-of-type { margin-top: auto; }
+.decision-help { margin: 0 0 6px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.decision-privacy-hint { margin-top: 14px; padding: 13px; border-radius: 8px; background: #eef6f1; color: #216c56; font-size: 11px; line-height: 1.7; }
+.decision-list { display: grid; gap: 8px; max-height: 205px; overflow-y: auto; }
+.decision-list-button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid var(--line); text-align: left; background: #fffefa; }
+.decision-list-button strong { overflow-wrap: anywhere; font-size: 12px; }
+.decision-list-button span { flex: 0 0 auto; font-size: 10px; color: var(--sage); }
+.decision-list-button[aria-pressed=true] { border-color: var(--sage); background: #eff7f0; }
+.decision-empty { margin: 10px 0; padding: 16px; color: var(--muted); font-size: 12px; background: #faf8f4; border: 1px dashed var(--line); border-radius: 9px; }
+.decision-current-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 21px 0 16px; padding: 16px; background: #f0eadf; border-radius: 10px; }
+.decision-current-bar strong { display: block; font-size: 17px; overflow-wrap: anywhere; }
+.decision-status-tag { font-size: 11px; font-weight: 800; background: #fffefa; border-radius: 999px; padding: 6px 11px; white-space: nowrap; }
+.decision-status-tag.confirmed { color: #216c56; background: #e1f5e8; }
+.decision-member-list { padding-left: 20px; margin: 7px 0; display: grid; gap: 10px; font-size: 12px; }
+.decision-wide { margin-bottom: 17px; }
+.decision-card-heading { display: flex; justify-content: space-between; align-items: start; gap: 14px; }
+.decision-card-heading button { flex: 0 0 auto; }
+.decision-options { display: grid; gap: 9px; }
+.decision-option { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.3fr auto; gap: 9px; align-items: end; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: white; }
+.decision-option label { display: grid; gap: 6px; min-width: 0; }
+.decision-option input { margin: 0; min-width: 0; }
+.decision-remove { border: 1px solid #dcc7bf; color: #a24f40; background: #fff9f6; border-radius: 7px; padding: 11px 8px; font-size: 10px; }
+.decision-consent { display: flex; gap: 9px; align-items: start; font-size: 11px; line-height: 1.7; }
+.decision-consent input { margin-top: 3px; }
+.decision-candidate-text { font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; padding: 13px; border: 1px solid var(--line); border-radius: 8px; background: white; }
+@media (max-width: 1000px) { .decision-option { grid-template-columns: repeat(2, minmax(0, 1fr)); } .decision-option .decision-remove { grid-column: 1 / -1; } }
+@media (max-width: 650px) { .decision-workspace { padding: 18px; } .decision-heading { display: block; } .decision-heading button { margin-top: 14px; } .decision-top-grid { grid-template-columns: 1fr; } .decision-option { grid-template-columns: 1fr; } .decision-card-heading { display: block; } .decision-card-heading button { margin-top: 10px; } .decision-current-bar { align-items: start; flex-direction: column; } }
