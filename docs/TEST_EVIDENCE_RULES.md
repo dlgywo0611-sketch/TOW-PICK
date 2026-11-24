@@ -3,6 +3,7 @@
 - WBS: 1.2.7
 - 작성일: 2026-11-24
 - 담당: 이효재
+- 기능 갱신: WBS 2.2.5 원담당 김해인, 실제 구현 이효재(대행)
 - 기준 문서: `MVP_SCOPE.md`, `API_CONTRACT.md`, `USER_JOURNEY.md`, `FEATURE_SPEC.md`, `SYSTEM_ARCHITECTURE.md`, `DB_DESIGN.md`
 - 완료 기준: 성공·실패·미검증 구분과 증빙 경로 정의
 
@@ -175,7 +176,22 @@ workflow 캔버스가 존재하는 것만으로 PASS 처리하지 않는다. 실
 
 2026-11-24 현재 `python -m unittest discover -s tests -v`의 기존 6개 테스트는 통과했다. PASS 범위는 해당 테스트가 직접 실행·검증한 주장으로 제한한다.
 
-### 3.4 프론트엔드·백엔드 통합
+### 3.4 개인별 비공개 조건
+
+| ID | 시나리오 | 예상 결과 | 최소 증빙 | 현재 테스트 상태 |
+|---|---|---|---|---|
+| P0-COND-01 | A/B 각각 조건 저장·본인 조회 | 사용자별 서로 다른 행을 저장하고 `/me`는 본인 행만 반환 | `tests/test_private_conditions.py` | PASS |
+| P0-COND-02 | 상대방 상세 조건 보호 | 상대 계정의 `/me`는 상대 행이 아니라 본인 행만 조회하며 미제출 시 404 | 자동 테스트와 응답 필드 확인 | PASS |
+| P0-COND-03 | 제출 상태 공유 | status 응답은 구성원별 `user_id`, `submitted`만 반환 | 민감 문자열 비노출 assertion | PASS |
+| P0-COND-04 | 타 커플 접근 차단 | PUT/GET/status 모두 403 | endpoint별 부정 자동 테스트 | PASS |
+| P0-COND-05 | 인증·입력·ID 조작 차단 | 무인증 401, 잘못된 값과 `user_id`/`couple_id` 추가 422 | 자동 테스트 | PASS |
+| P0-COND-06 | 반복 PUT 수정 | 동일 `(decision_id, user_id)` 행 1건을 갱신 | DB row count assertion | PASS |
+| P0-COND-07 | Candidate 생성 후 변경 차단 | 기존·신규 조건 PUT 모두 409, 저장값 유지 | Candidate 생성 후 자동 테스트 | PASS |
+| P0-COND-08 | 조건 기반 추천 | 두 사용자 조건으로 후보 자동 생성 | 추천 API/알고리즘 증빙 | NOT TESTED — 이번 WBS 제외, 미구현 |
+
+2026-11-24 `feature/p0-private-conditions-20261124`에서 신규 8개와 기존 6개, 총 14개 Python 자동 테스트를 실행해 모두 통과했다. 브라우저 UI 통합과 동시 PUT 경쟁 테스트는 수행하지 않았으므로 각각 NOT TESTED로 유지한다.
+
+### 3.5 프론트엔드·백엔드 통합
 
 | ID | 시나리오 | 실행 절차 | 예상 결과 | 최소 증빙 | 현재 테스트 상태 |
 |---|---|---|---|---|---|
@@ -358,7 +374,8 @@ WBS 1.2.7의 담당자는 이효재다.
 | BLE Meem FFE0/FFE1 연결·LED 반복 테스트 | prototype / main 미통합 | PARTIAL | 성주연의 2026-11-23 실제 반복 시험 성공 기록 | 사진·영상·통신 결과 경로 등록 후 PASS 전환 |
 | BLE Notify 버튼 | not implemented | NOT TESTED | 미완료로 문서화 | 구현 후 실물 반복 테스트 |
 | PET DOCK이 승인을 만들지 않음 | architecture boundary | NOT TESTED | 설계와 prototype 코드에는 승인 호출 없음 | main 통합 후 부정 통합 테스트 |
-| 개인 비공개 조건·추천 | planned | NOT TESTED | 모델/API 없음 | 구현 및 privacy·추천 시나리오 테스트 |
+| 개인 비공개 조건 API | implemented | PASS | `tests/test_private_conditions.py`, 신규 8개 테스트 | 브라우저 UI·동시 PUT은 별도 검증 |
+| 두 사용자 조건 기반 추천 | planned | NOT TESTED | 추천 모델/API 없음 | 다음 P0 단계에서 구현·검증 |
 | OUR PET·경험치 | planned | NOT TESTED | 모델/API 없음 | 중복 지급 포함 구현·테스트 |
 | CARE 일정·n8n 알림 | planned | NOT TESTED | 구현·실행 증빙 없음 | 일정 등록, trigger, 실제 알림, 중복 테스트 |
 | 실제 커플 사용자 테스트 | planned | NOT TESTED | 참여자·결과 없음 | 모집·동의·시나리오 수행·익명 결과 기록 |

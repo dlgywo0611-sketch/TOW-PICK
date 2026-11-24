@@ -3,7 +3,9 @@
 - WBS: 1.2.2
 - 작성일: 2026-11-24
 - 담당: 이효재(김해인 대행)
-- 코드 기준: `main` 및 `origin/main`의 `812e82d`
+- 기능 갱신: WBS 2.2.5 개인별 비공개 조건 API
+- WBS 원담당: 김해인 / 실제 구현: 이효재(대행)
+- 코드 기준: `main`의 `01eb9e2`에서 분기한 `feature/p0-private-conditions-20261124`
 - 확인 파일: `main.py`, `schemas.py`, `auth.py`, `models.py`, `frontend/app.js`, `frontend/index.html`
 
 이 문서는 현재 FastAPI 코드에 실제 구현된 계약을 기준으로 한다. `planned` 항목은 아직 endpoint, request schema, response schema가 없으며 프론트엔드에서 호출하면 안 된다.
@@ -246,6 +248,9 @@ Body 없이 호출한다. 로그인 사용자가 속할 새 Couple을 만들고 
 | POST | `/decisions` | Bearer | JSON `DecisionCreate` | 201 `DecisionRead` | 401, 409 커플 미가입, 422 |
 | GET | `/decisions` | Bearer | 없음 | 200 `DecisionRead[]` | 401, 409 커플 미가입 |
 | GET | `/decisions/{decision_id}` | Bearer | path integer | 200 `DecisionDetailRead` | 401, 403 타 커플, 404 없음, 409 커플 미가입, 422 |
+| PUT | `/decisions/{decision_id}/conditions/me` | Bearer | JSON `DecisionConditionUpsert` | 200 `DecisionConditionRead` | 401, 403, 404, 409, 422 |
+| GET | `/decisions/{decision_id}/conditions/me` | Bearer | 없음 | 200 `DecisionConditionRead` | 401, 403, 404, 409, 422 |
+| GET | `/decisions/{decision_id}/conditions/status` | Bearer | 없음 | 200 `DecisionConditionStatusRead` | 401, 403, 404, 409, 422 |
 
 ### 4.1 Decision 생성 — `POST /decisions`
 
@@ -359,6 +364,83 @@ current 후보와 한 명의 승인이 있을 때:
 - 422 `decision_id`가 integer가 아님
 
 상세 API는 current 후보만 반환하며 과거 후보 목록을 반환하지 않는다.
+
+### 4.4 개인별 비공개 조건
+
+#### 내 조건 저장·수정 — `PUT /decisions/{decision_id}/conditions/me`
+
+요청:
+
+```json
+{
+  "max_budget": 50000,
+  "available_time": "토요일 18:00~21:00",
+  "preferences": "조용한 좌석, 한식 선호",
+  "avoidances": "대기 30분 이상, 매운 음식"
+}
+```
+
+200 응답:
+
+```json
+{
+  "max_budget": 50000,
+  "available_time": "토요일 18:00~21:00",
+  "preferences": "조용한 좌석, 한식 선호",
+  "avoidances": "대기 30분 이상, 매운 음식",
+  "id": 1,
+  "decision_id": 100,
+  "user_id": 1,
+  "created_at": "2026-11-24T12:00:00Z",
+  "updated_at": "2026-11-24T12:00:00Z"
+}
+```
+
+- `max_budget`는 0 이상 1,000,000,000 이하의 정수다.
+- `available_time`은 공백 제거 후 1~200자다.
+- `preferences`, `avoidances`는 각각 최대 1,000자이며 빈 문자열을 허용한다.
+- 같은 사용자가 같은 Decision에 다시 PUT하면 기존 행을 수정한다.
+- `user_id`, `couple_id`, `decision_id`는 Body로 받지 않는다. 추가 필드는 422로 거부하며 소유권은 JWT에서 결정한다.
+- Candidate가 하나라도 생성된 뒤에는 조건의 최초 저장과 수정을 모두 409 `Conditions cannot be changed after candidate creation`으로 차단한다. 현재 Candidate 생성 API는 조건 제출 완료를 강제하지 않으므로 프론트는 반드시 두 사용자의 제출 완료 후 후보 생성을 요청해야 한다.
+- confirmed Decision은 409 `Decision is already closed`다.
+
+#### 내 조건 조회 — `GET /decisions/{decision_id}/conditions/me`
+
+응답은 위 `DecisionConditionRead`와 같다. JWT 사용자의 `(decision_id, user_id)` 행만 조회하며 상대방 조건을 선택할 path/query/body 인자가 없다. 본인 조건이 없으면 404 `Conditions not found`다.
+
+#### 제출 여부 조회 — `GET /decisions/{decision_id}/conditions/status`
+
+200 응답:
+
+```json
+{
+  "decision_id": 100,
+  "submitted_count": 1,
+  "member_conditions": [
+    {
+      "user_id": 1,
+      "submitted": true
+    },
+    {
+      "user_id": 2,
+      "submitted": false
+    }
+  ]
+}
+```
+
+이 응답은 커플 구성원별 `user_id`와 제출 여부만 제공한다. 예산, 시간, 선호, 회피 조건 및 조건 행 ID는 포함하지 않는다. 추천 backend는 향후 서버 내부에서 두 개인 행을 조회할 수 있지만 공유 API가 상세 값을 반환해서는 안 된다.
+
+공통 주요 오류:
+
+- 401 Bearer 인증 없음·실패
+- 403 `You cannot access this decision`: 타 커플 Decision
+- 404 `Decision not found`
+- 404 `Conditions not found`: 내 조건 조회에만 해당
+- 409 `User does not belong to a couple`
+- 409 `Decision is already closed`: PUT에만 해당
+- 409 `Conditions cannot be changed after candidate creation`: PUT에만 해당
+- 422 path 또는 Body 검증 실패
 
 ## 5. Candidate 및 승인 API
 
@@ -504,8 +586,6 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 
 | 영역 | 상태 | 현재 계약 |
 |---|---|---|
-| 개인 비공개 조건 저장·조회 | planned | endpoint/schema 없음 |
-| 조건 제출 여부 공유 | planned | endpoint/schema 없음 |
 | 두 사용자 조건 기반 추천 | planned | endpoint/schema 없음 |
 | Candidate 자동 생성·추천 | planned | 현재 Candidate 수동 생성 API만 존재 |
 | 별도 최종 결정 기록 | planned | 현재는 `Decision.status`와 current Candidate만 사용 |

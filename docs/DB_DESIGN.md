@@ -2,7 +2,9 @@
 
 - WBS: 1.2.5
 - 검수일: 2026-11-24
-- 기준: `origin/main` `eddb574`의 `models.py`와 실제 API
+- 기능 갱신: WBS 2.2.5 개인별 비공개 조건 API
+- WBS 원담당: 김해인 / 실제 구현: 이효재(대행)
+- 기준: `main`의 `01eb9e2`에서 분기한 `feature/p0-private-conditions-20261124`의 `models.py`와 실제 API
 - DB: SQLite (`sqlite:///./tow_pick.db`)
 
 ## 관계 개요
@@ -11,6 +13,7 @@
 Couple 1 ── N User
 Couple 1 ── N Message N ── 1 User(sender)
 Couple 1 ── N Decision N ── 1 User(created_by)
+Decision 1 ── N DecisionCondition N ── 1 User
 Decision 1 ── N DecisionCandidate
 DecisionCandidate 1 ── N DecisionApproval N ── 1 User
 
@@ -84,6 +87,24 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 
 현재 `status`는 문자열 `open`/`confirmed`를 사용하지만 DB CHECK 또는 enum은 없다. `created_by_id`의 사용자가 같은 커플인지 DB 복합 제약으로는 보장하지 않는다.
 
+### DecisionCondition
+
+| 항목 | 내용 |
+|---|---|
+| 소유자 | `user_id`의 개인 비공개 조건. 상위 Decision의 커플 스코프에 속함 |
+| 주요 컬럼 | `id`, `decision_id`, `user_id`, `max_budget`, `available_time`, `preferences`, `avoidances`, `created_at`, `updated_at` |
+| user_id 관계 | `user_id → users.id`; 요청 Body가 아니라 JWT 사용자로 지정 |
+| couple_id 관계 | 직접 컬럼 없음. `decision_id → decisions.couple_id`로 권한 확인 |
+| version | 없음. Candidate 생성 전까지 동일 행을 수정하며 Candidate 생성 뒤에는 변경 차단 |
+| unique | `(decision_id, user_id)` |
+| 중복 규칙 | 같은 사용자의 반복 PUT은 새 행을 만들지 않고 기존 행을 수정 |
+
+`max_budget`은 정수이며 API에서 0~1,000,000,000 범위를 검증한다. `available_time`은 최대 200자, `preferences`와 `avoidances`는 각각 최대 1,000자다. 상대방 상세 조건을 반환하는 API는 없고 제출 상태 응답에는 커플 구성원의 `user_id`와 boolean만 포함한다.
+
+현재 스키마 초기화 방식인 `Base.metadata.create_all()`은 기존 테이블이나 행을 삭제하지 않고 `decision_conditions`가 없을 때 새 테이블만 생성한다. 별도 migration 도구와 schema version 이력은 아직 없으므로 배포 전 DB 백업 및 신규 테이블 생성 확인은 운영 절차로 남는다.
+
+후보가 생성된 뒤 조건이 바뀌어 추천 근거와 Candidate가 불일치하는 일을 막기 위해, 현재 정책은 Candidate 1건 이상 존재 시 조건의 최초 저장과 수정 모두 거부한다. 향후 조건 version과 Candidate 입력 snapshot을 도입하기 전까지 이 정책을 유지한다.
+
 ### DecisionCandidate
 
 | 항목 | 내용 |
@@ -115,15 +136,17 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 
 1. 후보 버전은 `(decision_id, version)` unique로 중복을 막는다.
 2. 사용자의 후보 승인은 `(candidate_id, user_id)` unique로 중복을 막는다.
-3. 현재 후보에 대한 서로 다른 승인 사용자 수가 2이고 커플 구성원이 정확히 2명이면 결정 상태를 `confirmed`로 바꾼다.
-4. 확정 이후 후보 생성과 승인은 `status != open` 검사로 막는다.
-5. 현재 구현은 정상적인 순차 요청을 처리하지만 동시 버전 생성·동시 승인의 원자성은 보장하지 않는다.
+3. 개인 조건은 `(decision_id, user_id)` unique로 사용자별 결정당 1행을 유지한다.
+4. 현재 후보에 대한 서로 다른 승인 사용자 수가 2이고 커플 구성원이 정확히 2명이면 결정 상태를 `confirmed`로 바꾼다.
+5. 확정 이후 후보 생성과 승인은 `status != open` 검사로 막는다.
+6. 현재 구현은 정상적인 순차 요청을 처리하지만 동시 버전 생성·동시 승인·동시 조건 PUT의 원자성은 별도 보강 대상이다.
 
 ## 타 커플 접근 차단 원칙
 
 - 소유권의 기준은 요청 본문의 ID가 아니라 인증된 `current_user.couple_id`다.
 - 커플 공유 데이터 목록은 항상 `WHERE couple_id = current_user.couple_id`로 조회한다.
 - 단건 결정, 후보, 승인 접근은 최종적으로 연결된 `Decision.couple_id`를 현재 사용자와 비교한다.
+- 개인 조건 저장·조회는 `Decision.couple_id` 검증 후 JWT 사용자 ID로만 행을 선택한다. 상대방 상세 행을 선택하는 API는 제공하지 않는다.
 - 신규 하위 테이블도 직접 `couple_id`를 갖거나 상위 FK 경로로 커플을 검증해야 한다.
 - 생성 시 `user_id`, `created_by_id`, `sender_id`, `couple_id`는 가능한 한 서버가 인증 컨텍스트에서 채운다.
 - 타 커플 단건 접근은 현재 결정 API 정책대로 403, 존재하지 않는 리소스는 404로 처리한다.

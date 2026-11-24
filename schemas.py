@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MessageCreate(BaseModel):
@@ -76,6 +78,39 @@ class DecisionCandidateStatusRead(BaseModel):
 class DecisionDetailRead(DecisionRead):
     current_candidate: DecisionCandidateStatusRead | None
     confirmed: bool
+
+
+class DecisionConditionUpsert(BaseModel):
+    max_budget: int = Field(ge=0, le=1_000_000_000)
+    available_time: str = Field(min_length=1, max_length=200)
+    preferences: str = Field(max_length=1000)
+    avoidances: str = Field(max_length=1000)
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
+
+
+class DecisionConditionRead(DecisionConditionUpsert):
+    id: int
+    decision_id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DecisionConditionMemberStatusRead(BaseModel):
+    user_id: int
+    submitted: bool
+
+
+class DecisionConditionStatusRead(BaseModel):
+    decision_id: int
+    submitted_count: int
+    member_conditions: list[DecisionConditionMemberStatusRead]
 
 
 class DecisionCandidateCreate(BaseModel):
