@@ -129,6 +129,43 @@ class DecisionCondition(Base):
     )
 
 
+class DecisionRecommendationAttempt(Base):
+    """One recommendation evaluation per Decision, even if none matches.
+
+    Do not persist user-supplied option pools, individual preference scores,
+    private conditions or specific rejection reasons here.
+    """
+
+    __tablename__ = "decision_recommendation_attempts"
+    __table_args__ = (
+        UniqueConstraint(
+            "decision_id",
+            name="uq_decision_recommendation_attempt",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    decision_id: Mapped[int] = mapped_column(
+        ForeignKey("decisions.id"),
+        nullable=False,
+        index=True,
+    )
+    requested_by_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False)
+    candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("decision_candidates.id"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
 class DecisionCandidate(Base):
     __tablename__ = "decision_candidates"
     __table_args__ = (

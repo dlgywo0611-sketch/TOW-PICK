@@ -394,3 +394,17 @@ WBS 1.2.7의 담당자는 이효재다.
 - 담당자 부재 시 대행 기록 원칙
 
 따라서 WBS 1.2.7 완료 기준인 **“성공·실패·미검증 구분과 증빙 경로 정의”를 충족**한다. 이는 증빙 규칙 문서의 완료 판정이며, 표에 포함된 개별 기능이 모두 구현·검증됐다는 뜻은 아니다.
+
+
+## P0 규칙형 추천 시나리오 (PR CI 검증 필요)
+
+| ID | 시나리오 | 검증 파일 | 현재 판정 |
+|---|---|---|---|
+| P0-REC-01 | 두 사용자 조건 완료 후 추천 Candidate v1 및 양측 승인 | `tests/test_balanced_recommendations.py` | NOT VERIFIED — PR CI 대기 |
+| P0-REC-02 | 양쪽 2인 총액 상한·시간·회피 태그의 강제 필터 | 신규 API 및 순수규칙 테스트 | NOT VERIFIED — PR CI 대기 |
+| P0-REC-03 | 최소 만족도 우선 공정성·순서 독립성 | `tests/test_recommendation_rules.py` | 로컬 순수규칙 7개 PASS, API CI 대기 |
+| P0-REC-04 | JWT 인증, 타 커플 접근 차단, 입력 ID 주입 차단 | 신규 API 테스트 | NOT VERIFIED — PR CI 대기 |
+| P0-REC-05 | 성공·적합 없음 각각 1회 실행, 수동 후보 회복 | 신규 API 테스트 | NOT VERIFIED — PR CI 대기 |
+| P0-REC-06 | 프론트 A/B 실제 브라우저 시연 | 화면녹화·Network 로그 | NOT TESTED |
+
+Python 전체 테스트, PET DOCK Node, 사용자 브라우저 시험은 PR 반영 후 실행해야 한다. 테스트를 실행하지 않았다면 PASS로 바꾸지 않는다.

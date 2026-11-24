@@ -5,11 +5,13 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 import models
 import schemas
 from database import Base, engine, get_db
+from recommendation_engine import choose_balanced_option
 
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
@@ -595,6 +597,123 @@ def read_decision_condition_status(
             item.submitted for item in member_conditions
         ),
         member_conditions=member_conditions,
+    )
+
+
+@app.post(
+    "/decisions/{decision_id}/recommendations",
+    response_model=schemas.RecommendationRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def recommend_candidate(
+    decision_id: int,
+    request: schemas.RecommendationCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """One-shot, private, deterministic choice from user-supplied demo options.
+
+    Scores and individual private preferences never leave the server.
+    This does not claim real price or booking verification.
+    """
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not belong to a couple",
+        )
+
+    decision = get_decision_for_current_couple(db, decision_id, current_user)
+    if decision.status != "open":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Decision is already closed",
+        )
+
+    attempt_id = db.scalar(
+        select(models.DecisionRecommendationAttempt.id).where(
+            models.DecisionRecommendationAttempt.decision_id == decision.id
+        )
+    )
+    if attempt_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Recommendation already attempted for this decision",
+        )
+
+    candidate_id = db.scalar(
+        select(models.DecisionCandidate.id).where(
+            models.DecisionCandidate.decision_id == decision.id
+        )
+    )
+    if candidate_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Recommendation only available before first candidate",
+        )
+
+    couple = get_couple_with_members(db, decision.couple_id)
+    member_ids = set() if couple is None else {member.id for member in couple.members}
+    conditions = list(db.scalars(
+        select(models.DecisionCondition).where(
+            models.DecisionCondition.decision_id == decision.id,
+            models.DecisionCondition.user_id.in_(member_ids),
+        )
+    ).all())
+    if len(member_ids) != 2 or {item.user_id for item in conditions} != member_ids:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Both couple members must submit conditions before recommendation",
+        )
+
+    selected = choose_balanced_option(request.options, conditions)
+    attempt = models.DecisionRecommendationAttempt(
+        decision_id=decision.id,
+        requested_by_id=current_user.id,
+        outcome="selected" if selected is not None else "no_match",
+    )
+
+    candidate = None
+    try:
+        db.add(attempt)
+        if selected is not None:
+            # The input price is only a demo estimate. Make this explicit in
+            # the final Candidate text shown to BOTH people before approval.
+            candidate = models.DecisionCandidate(
+                decision_id=decision.id,
+                content=(
+                    f"{selected.title} / {selected.time_slot} / "
+                    f"2인 총액 {selected.estimated_total_cost_krw:,}원"
+                    "(시연용·확인 필요)"
+                ),
+                version=1,
+                is_current=True,
+            )
+            db.add(candidate)
+            db.flush()
+            attempt.candidate_id = candidate.id
+        # Persist even a no-match attempt, preventing repeated condition probes.
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Recommendation request conflicted with another update",
+        ) from error
+
+    if candidate is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No mutually suitable option; try a manual candidate",
+        )
+
+    db.refresh(candidate)
+    return schemas.RecommendationRead(
+        policy_version="balanced_rules_v1",
+        message=(
+            "두 사람이 수용 가능한 시연용 후보를 선정했습니다. "
+            "실제 가격과 예약 가능 여부를 확인하세요."
+        ),
+        candidate=schemas.DecisionCandidateRead.model_validate(candidate),
     )
 
 
