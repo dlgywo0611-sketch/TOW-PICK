@@ -13,7 +13,7 @@
 - 현재 저장소와 `docs/`의 기획·설계 문서
 - 현재 `main` 및 Git 전체 이력
 - GitHub merge commit에 기록된 PR 번호
-- 현재 브랜치의 미커밋 문서 목록
+- PR #6의 최초 기획 문서 commit `922da0e`와 현재 검수 상태
 - 기존 자동 테스트와 하드웨어 검증 상태를 정리한 문서
 
 ### 실제 Notion에서 확인·반영한 내용
@@ -48,17 +48,17 @@
 
 | WBS ID | 작업명 | 담당/대행 기록 | WBS 판정 | 증빙 단계 | 근거 |
 |---|---|---|---|---|---|
-| 1.1.1 | 서비스 목표·P0/P1/P2 확정 | 기존 주담당자 유지 | 완료 | 문서 작성 완료 / GitHub 반영 대기 | `docs/MVP_SCOPE.md` |
-| 1.1.2 | 고객 페르소나·사용자 여정 | 기존 주담당자 유지 | 완료 | 문서 작성 완료 / GitHub 반영 대기 | `docs/USER_JOURNEY.md` |
+| 1.1.1 | 서비스 목표·P0/P1/P2 확정 | 기존 주담당자 유지 | 완료 | PR #6 Open / main 반영 대기 | `docs/MVP_SCOPE.md` |
+| 1.1.2 | 고객 페르소나·사용자 여정 | 기존 주담당자 유지 | 완료 | PR #6 Open / main 반영 대기 | `docs/USER_JOURNEY.md` |
 | 1.1.3 | 상세 기능 명세서 정합성 검수 | 주담당 김해인, 이효재 대행 기록 | 완료 | `main` 반영 완료 | PR #5, `docs/FEATURE_SPEC.md` |
-| 1.1.5 | OUR PET 캐릭터 2종·생일 조합 배정 콘셉트 확정 | 이효재 | 완료 | 문서 작성 완료 / GitHub 반영 대기 | `docs/OUR_PET_CONCEPT.md` |
+| 1.1.5 | OUR PET 캐릭터 2종·생일 조합 배정 콘셉트 확정 | 이효재 | 완료 | PR #6 Open / main 반영 대기 | `docs/OUR_PET_CONCEPT.md` |
 | 1.2.1 | BLE 변경 반영 시스템 구조도 확정 | 주담당 김해인, 이효재 대행 기록 | 완료 | `main` 반영 완료 | PR #5, `docs/SYSTEM_ARCHITECTURE.md` |
-| 1.2.2 | 프론트·백엔드 API 계약 정의 | 주담당 김해인, 이효재 대행 기록 | 완료 | 문서 작성 완료 / GitHub 반영 대기 | `docs/API_CONTRACT.md` |
-| 1.2.5 | 계정·커플·결정·펫 DB 설계 | 주담당 김해인, 이효재 대행 기록 | 완료 | `main` 반영 후 추가 기획 보완 대기 | PR #5, `docs/DB_DESIGN.md` |
-| 1.2.7 | 테스트 시나리오·증빙 규칙 정리 | 이효재 | 완료 | 문서 작성 완료 / GitHub 반영 대기 | `docs/TEST_EVIDENCE_RULES.md` |
-| 1.2.8 | n8n 알림 동의·개인정보 전송 범위 설계 | 이효재 | 완료 | 문서 작성 완료 / GitHub 반영 대기 | `docs/NOTIFICATION_PRIVACY.md` |
+| 1.2.2 | 프론트·백엔드 API 계약 정의 | 주담당 김해인, 이효재 대행 기록 | 완료 | PR #6 Open / main 반영 대기 | `docs/API_CONTRACT.md` |
+| 1.2.5 | 계정·커플·결정·펫 DB 설계 | 주담당 김해인, 이효재 대행 기록 | 완료 | PR #5 main 반영 / PR #6 보완 검수 중 | PR #5, PR #6, `docs/DB_DESIGN.md` |
+| 1.2.7 | 테스트 시나리오·증빙 규칙 정리 | 이효재 | 완료 | PR #6 Open / main 반영 대기 | `docs/TEST_EVIDENCE_RULES.md` |
+| 1.2.8 | n8n 알림 동의·개인정보 전송 범위 설계 | 이효재 | 완료 | PR #6 Open / main 반영 대기 | `docs/NOTIFICATION_PRIVACY.md` |
 
-PR #5는 merge commit `812e82d`로 `main`에 반영됐다. 현재 `feature/planning-20261124`의 신규 기획 문서와 `DB_DESIGN.md` 보완은 아직 commit·push·PR·merge되지 않았다.
+PR #5는 merge commit `812e82d`로 `main`에 반영됐다. 이후 `feature/planning-20261124`의 신규 기획 문서와 `DB_DESIGN.md` 보완은 commit `922da0e`로 커밋·push됐고 PR #6이 생성됐다. 현재 PR #6은 **Open / 검수 중**이며 `main`에는 아직 병합되지 않았다.
 
 ### 검증 대기·차단·미구현
 
@@ -83,16 +83,16 @@ PR #5는 merge commit `812e82d`로 `main`에 반영됐다. 현재 `feature/plann
 
 | WBS ID | 변경 전 상태 | 변경 후 상태 | 담당자/대행 기록 | 산출물·링크 추가 | 완료 기준 변경 | 변경 사유 |
 |---|---|---|---|---|---|---|
-| 1.1.1 | 미확인 | 완료 | 기존 값 유지 | `docs/MVP_SCOPE.md` 또는 향후 PR 링크 | P0/P1/P2 범위와 하드웨어 독립성 확정 | 기획 산출물 완료 |
-| 1.1.2 | 미확인 | 완료 | 기존 값 유지 | `docs/USER_JOURNEY.md` 또는 향후 PR 링크 | 가상 페르소나와 향후 실제 검증 가설 구분 | 기획 산출물 완료 |
+| 1.1.1 | 미확인 | 완료 | 기존 값 유지 | PR #6, `docs/MVP_SCOPE.md` | P0/P1/P2 범위와 하드웨어 독립성 확정 | 기획 산출물 완료, PR Open / main 반영 대기 |
+| 1.1.2 | 미확인 | 완료 | 기존 값 유지 | PR #6, `docs/USER_JOURNEY.md` | 가상 페르소나와 향후 실제 검증 가설 구분 | 기획 산출물 완료, PR Open / main 반영 대기 |
 | 1.1.3 | Notion 행 확인 | 완료 | 김해인 주담당 유지, 이효재 대행 기록 반영 | PR #5, `docs/FEATURE_SPEC.md` | 실제 코드 기준 정합성 검수 | Notion 문서 완료·대행 기록 갱신 확인 |
-| 1.1.5 | 미확인 | 완료 | 이효재 | `docs/OUR_PET_CONCEPT.md` 또는 향후 PR 링크 | 아래 변경안 적용 | 곰·토끼 2종 기획 변경 확정 |
+| 1.1.5 | 미확인 | 완료 | 이효재 | PR #6, `docs/OUR_PET_CONCEPT.md` | 아래 변경안 적용 | 곰·토끼 2종 기획 변경 확정, PR Open / main 반영 대기 |
 | 1.2.1 | 미확인 | 완료 | 김해인 주담당 유지, 이효재 대행 기록 | PR #5, `docs/SYSTEM_ARCHITECTURE.md` | USB Serial과 BLE WRITE 경로 분리, 승인 경계 확정 | `main` 반영 확인 |
-| 1.2.2 | 미확인 | 완료 | 김해인 주담당 유지, 이효재 대행 기록 | `docs/API_CONTRACT.md` 또는 향후 PR 링크 | endpoint·schema·권한·planned API 계약 구분 | 문서 완료, GitHub 반영 대기 |
-| 1.2.5 | Notion 행 확인 | 완료 | 김해인 주담당 유지, 이효재 대행 기록 반영 | PR #5, `docs/DB_DESIGN.md` | 현재 모델과 planned 모델 구분 | Notion 문서 완료·대행 기록 갱신 확인, 펫 배정 설계 추가 반영 예정 |
-| 1.2.6 | 일부 반영 | 진행 중 / PARTIAL | 이효재 | 본 문서 3종 향후 PR 링크 | 실제 Notion DB·칸반 보기·리스크표 설정 및 확인 | 속성 일부 추가, 리스크 DB는 무료 블록 한도로 생성 차단 |
-| 1.2.7 | 미확인 | 완료 | 이효재 | `docs/TEST_EVIDENCE_RULES.md` 또는 향후 PR 링크 | PASS/FAIL/PARTIAL/NOT TESTED와 증빙 경로 정의 | 문서 완료, GitHub 반영 대기 |
-| 1.2.8 | 미확인 | 완료 | 이효재 | `docs/NOTIFICATION_PRIVACY.md` 또는 향후 PR 링크 | 동의 없는 알림 금지·민감 조건 미전송 | 문서 완료, GitHub 반영 대기 |
+| 1.2.2 | 미확인 | 완료 | 김해인 주담당 유지, 이효재 대행 기록 | PR #6, `docs/API_CONTRACT.md` | endpoint·schema·권한·planned API 계약 구분 | 문서 완료, PR Open / main 반영 대기 |
+| 1.2.5 | Notion 행 확인 | 완료 | 김해인 주담당 유지, 이효재 대행 기록 반영 | PR #5, PR #6, `docs/DB_DESIGN.md` | 현재 모델과 planned 모델 구분 | Notion 문서 완료·대행 기록 갱신 확인, PR #6에서 펫 배정 설계 보완 검수 중 |
+| 1.2.6 | 일부 반영 | 진행 중 / PARTIAL | 이효재 | PR #6, 본 문서 3종 | 실제 Notion DB·칸반 보기·리스크표 설정 및 확인 | 속성 일부 추가, 리스크 DB는 무료 블록 한도로 생성 차단 |
+| 1.2.7 | 미확인 | 완료 | 이효재 | PR #6, `docs/TEST_EVIDENCE_RULES.md` | PASS/FAIL/PARTIAL/NOT TESTED와 증빙 경로 정의 | 문서 완료, PR Open / main 반영 대기 |
+| 1.2.8 | 미확인 | 완료 | 이효재 | PR #6, `docs/NOTIFICATION_PRIVACY.md` | 동의 없는 알림 금지·민감 조건 미전송 | 문서 완료, PR Open / main 반영 대기 |
 | 1.1.4 | 미확인 | 검증 대기 | 최성빈, 기존 값과 대조 | 기존 와이어프레임 링크 확인 필요 | 전체 화면·flow 증빙 확인 후 완료 | 증빙 미확인 |
 | 1.2.3 | 미확인 | 검증 대기 | 기존 담당자 유지, 성주연 실물 시험 기록 연결 | 정식 증빙 파일/외부 링크 필요 | 실제 장비·반복 횟수·성공/실패 증빙 등록 | 시험 성공과 증빙 등록 분리 |
 | 1.2.4 | 미확인 | 차단 | 기존 값 유지 | datasheet·전압 측정 증빙 필요 | RXD 허용 전압과 보호회로 확인 | 안전 검증 미완료 |
@@ -114,9 +114,9 @@ PR #5는 merge commit `812e82d`로 `main`에 반영됐다. 현재 `feature/plann
 ## 4. 증빙 링크 등록 원칙
 
 - `main` 반영 문서는 PR 번호와 merge commit을 함께 기록한다.
-- 현재 브랜치의 미커밋 문서는 commit 전 임시 로컬 경로로만 표시하고, PR 생성 후 PR 링크로 교체한다.
+- 문서 작성 당시의 로컬 상태와 현재 GitHub 상태를 분리해 기록한다. PR #6의 최초 기획 문서 commit `922da0e`와 PR 링크를 증빙으로 사용한다.
 - 로컬 절대 경로를 Notion 공동 증빙 링크로 사용하지 않는다.
-- GitHub 반영 전에는 `문서 작성 완료 / GitHub 반영 대기`로 표시한다.
+- PR이 Open이면 `PR 검수 중 / main 반영 대기`, merge 후에는 `main 반영 완료`로 구분한다.
 - 기능 PASS에는 `TEST_EVIDENCE_RULES.md`의 증빙 규칙을 적용한다.
 - 하드웨어·사용자 테스트·대용량 영상은 접근 가능한 외부 공유 링크와 manifest를 연결한다.
 

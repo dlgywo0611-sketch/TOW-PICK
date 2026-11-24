@@ -160,7 +160,7 @@ workflow 캔버스가 존재하는 것만으로 PASS 처리하지 않는다. 실
 | ID | 시나리오 | 실행 절차 | 예상 결과 | 최소 증빙 | 현재 테스트 상태 |
 |---|---|---|---|---|---|
 | P0-DEC-01 | Decision 생성 | 커플 사용자가 `POST /decisions` | 201, `status=open`, 서버가 couple/user 지정 | 자동 테스트 또는 HTTP 로그 | NOT TESTED — endpoint 구현 |
-| P0-DEC-02 | Candidate v1 생성 | 열린 Decision에 첫 Candidate 생성 | 201, `version=1`, `is_current=true` | 자동 테스트와 DB 상태 | PASS — 기존 테스트 흐름에서 실행 |
+| P0-DEC-02 | Candidate v1 생성 | 열린 Decision에 첫 Candidate 생성 | 201, `version=1`, `is_current=true` | 자동 테스트와 DB 상태 | PARTIAL — 첫 생성의 201은 검증하지만 `version=1`과 최초 `is_current=true`를 모두 직접 assert하지 않음. 전용 테스트 필요 |
 | P0-DEC-03 | Candidate v2 및 v1 비활성화 | 같은 Decision에 두 번째 Candidate 생성 | v2 current, v1 `is_current=false` | 자동 테스트와 두 Candidate 상태 | PASS — `test_latest_candidate_and_approval_state_until_confirmed` |
 | P0-DEC-04 | 최신 Candidate 승인 | current Candidate를 A가 승인 | 201, A의 승인 행 생성 | 자동 테스트와 상세 조회 | PASS — 기존 테스트 흐름에서 실행 |
 | P0-DEC-05 | A만 승인 시 미확정 | A 승인 후 상세 조회 | `approval_count=1`, `confirmed=false` | 자동 테스트 결과 | PASS — 기존 테스트가 직접 검증 |
