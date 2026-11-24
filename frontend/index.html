@@ -6,6 +6,7 @@
     <meta name="description" content="OURVERSE TWO PICK 커플 연결 웹 UI" />
     <title>OURVERSE — TWO PICK</title>
     <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/petdock-bridge.js" defer></script>
     <script src="/static/app.js" defer></script>
   </head>
   <body>
@@ -127,6 +128,51 @@
               <button id="refresh-couple-button" class="refresh-button" type="button">연결 상태 새로고침</button>
             </div>
           </article>
+
+          <section class="petdock-panel" aria-labelledby="petdock-title">
+            <header class="petdock-heading">
+              <div>
+                <p class="eyebrow coral">PET DOCK · DEVICE</p>
+                <h3 id="petdock-title">우리 펫과 연결해요.</h3>
+                <p>USB 버튼으로 펫 반응을 확인하고, Meem 블루투스로 LED를 제어할 수 있어요.</p>
+              </div>
+              <span id="petdock-status" class="status-pill"><i></i> 연결 대기</span>
+            </header>
+
+            <div class="petdock-grid">
+              <article class="device-card">
+                <span class="device-icon">USB</span>
+                <div>
+                  <strong>Arduino 버튼</strong>
+                  <p>9600 baud · BTN_A / BTN_B</p>
+                </div>
+                <button id="connect-usb" class="device-button" type="button">USB 연결</button>
+              </article>
+
+              <article class="device-card">
+                <span class="device-icon coral-device">BLE</span>
+                <div>
+                  <strong>Meem LED</strong>
+                  <p>FFE0 서비스 · FFE1 특성</p>
+                </div>
+                <button id="connect-ble" class="device-button" type="button">블루투스 연결</button>
+              </article>
+            </div>
+
+            <div class="petdock-console">
+              <div>
+                <span>최근 펫 이벤트</span>
+                <strong id="pet-event" aria-live="polite">버튼 입력을 기다리고 있어요.</strong>
+              </div>
+              <div id="led-controls" class="led-controls" aria-label="LED 색상 선택">
+                <button data-led="red" class="led red" type="button" disabled aria-label="LED 빨강"></button>
+                <button data-led="green" class="led green" type="button" disabled aria-label="LED 초록"></button>
+                <button data-led="blue" class="led blue" type="button" disabled aria-label="LED 파랑"></button>
+                <button data-led="off" class="led off" type="button" disabled aria-label="LED 끄기">×</button>
+              </div>
+            </div>
+            <p class="device-help">Windows Chrome/Edge의 localhost 또는 HTTPS에서 사용하세요. 장치 연결은 사용자가 버튼을 눌러 허용해야 합니다.</p>
+          </section>
         </section>
       </section>
     </main>

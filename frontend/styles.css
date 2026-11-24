@@ -85,6 +85,30 @@ button { cursor: pointer; }
 .refresh-button { min-height: 32px; padding: 0 11px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 7px; background: rgba(255, 255, 255, .1); color: white; font-size: 9px; font-weight: 900; }
 .refresh-button:disabled { cursor: default; opacity: .65; }
 
+.petdock-panel { margin-top: 24px; padding: 27px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); box-shadow: 0 14px 36px rgba(48, 42, 31, .05); }
+.petdock-heading { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
+.petdock-heading h3 { margin: 0 0 7px; font: 500 25px Georgia, serif; }
+.petdock-heading p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.petdock-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.device-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 13px; padding: 15px; border: 1px solid var(--line); border-radius: 11px; background: #faf8f3; }
+.device-icon { display: grid; place-items: center; width: 39px; height: 39px; border-radius: 10px; background: var(--ink); color: white; font-size: 8px; font-weight: 900; letter-spacing: .04em; }
+.coral-device { background: var(--coral); }
+.device-card strong { display: block; margin-bottom: 4px; font-size: 11px; }
+.device-card p { margin: 0; color: var(--muted); font-size: 8px; }
+.device-button { min-height: 34px; padding: 0 11px; border: 1px solid #c7c0b4; border-radius: 7px; background: var(--white); color: var(--ink); font-size: 9px; font-weight: 900; }
+.device-button:disabled { cursor: default; opacity: .55; }
+.petdock-console { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 12px; padding: 16px; border-radius: 11px; background: #252522; color: white; }
+.petdock-console span { display: block; margin-bottom: 5px; color: #aaa69e; font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.petdock-console strong { font-size: 11px; }
+.led-controls { display: flex; gap: 8px; }
+.led { width: 29px; height: 29px; border: 2px solid rgba(255, 255, 255, .5); border-radius: 50%; }
+.led.red { background: #ef5b55; }
+.led.green { background: #48a678; }
+.led.blue { background: #4e82d8; }
+.led.off { background: transparent; color: white; font-size: 15px; }
+.led:disabled { cursor: default; filter: grayscale(1); opacity: .3; }
+.device-help { margin: 11px 2px 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+
 @media (max-width: 820px) {
   .shell { grid-template-columns: 1fr; }
   .sidebar { padding: 20px 24px; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -106,4 +130,10 @@ button { cursor: pointer; }
   .connected-card { grid-template-columns: auto 1fr; }
   .connected-actions { grid-column: 1 / -1; width: 100%; }
   .connected-code { width: 100%; text-align: center; }
+  .petdock-heading { display: block; }
+  .petdock-heading .status-pill { margin-top: 13px; }
+  .petdock-grid { grid-template-columns: 1fr; }
+  .device-card { grid-template-columns: auto 1fr; }
+  .device-button { grid-column: 1 / -1; }
+  .petdock-console { align-items: flex-start; flex-direction: column; }
 }
