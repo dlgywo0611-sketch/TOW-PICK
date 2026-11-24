@@ -592,7 +592,7 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 
 | 영역 | 상태 | 현재 계약 |
 |---|---|---|
-| 두 사용자 조건 기반 추천 | planned | endpoint/schema 없음 |
+| 두 사용자 조건 기반 규칙형 추천 | implemented (P0 rules) | `POST /decisions/{decision_id}/recommendations` — 신규 후보 v1 생성, 가격·시간은 시연용 |
 | Candidate 자동 생성·추천 | planned | 현재 Candidate 수동 생성 API만 존재 |
 | 별도 최종 결정 기록 | planned | 현재는 `Decision.status`와 current Candidate만 사용 |
 | 만족도·간단 피드백 | planned | endpoint/schema 없음 |
@@ -626,3 +626,17 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 - 현재 프론트가 호출하는 인증·커플 endpoint의 Method, Path, Body는 백엔드와 일치한다.
 - 공동결정 backend endpoint는 구현되어 있지만 현재 프론트에는 연결되지 않았다.
 - 개인 조건, 추천, OUR PET, 경험치, 일정, PET 이벤트 영속화는 UI 문구 또는 기획 범위와 달리 API가 없으므로 `planned`로 구분했다.
+
+
+## P0 규칙형 균형 추천 API
+
+- `POST /decisions/{decision_id}/recommendations` (JWT, JSON `RecommendationCreate`, 성공 201 `RecommendationRead`).
+- 최대 8개 시연용 후보의 `title`, `estimated_total_cost_krw`, `time_slot`, `tags`를 받는다(최소 2개).
+- **예산은 각 사용자별 2인 총액 상한**으로 해석하며, 제안 총액은 양쪽 상한 각각을 통과해야 한다. 상한을 합산하지 않는다.
+- 후보의 시각·태그는 문자열 정규화 후 완전 일치만 지원하고 자연어 추론은 하지 않는다.
+- 두 사람의 조건 제출 완료 + 첫 Candidate 생성 전 + Decision open 상태에서 **1회** 실행한다.
+- 적합 후보가 있으면 Candidate v1을 생성하지만, 양측 승인 API는 기존대로 따로 호출한다.
+- 적합 후보 없음도 시도 원장에 저장되어 동일 Decision에서 재추천 불가하다. 수동 후보 생성은 가능하다.
+- 응답은 추천 후보와 버전만 포함하며 상대방 조건·개인 점수·탈락 이유는 노출하지 않는다.
+- 상세 계약, 오류 코드, 가격 미검증 주의는 [`BALANCED_RECOMMENDATIONS.md`](BALANCED_RECOMMENDATIONS.md) 참조.
+- 실제 브라우저 UI, 실가격 검증, 동시 요청 원자성은 미구현/미검증 상태다.

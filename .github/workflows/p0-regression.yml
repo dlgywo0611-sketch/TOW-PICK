@@ -1,0 +1,37 @@
+name: TWO-PICK P0 regression
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feature/p0-balanced-recommendations-20261124
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-only-key-do-not-use-in-production-20261124
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt httpx
+      - name: Python API and rules tests
+        run: python -m unittest discover -s tests -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: PET DOCK regression
+        run: node tests/usb-reconnect.test.cjs
+      - name: JavaScript syntax
+        run: |
+          node --check frontend/app.js
+          node --check frontend/petdock-bridge.js

@@ -224,3 +224,10 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 3. current 후보 1건 보장과 버전 생성 경쟁 처리
 4. 최종 결정 기록 및 경험치 원장의 unique 기반 멱등 지급
 5. 피드백, PET 상태, 기념일·일정 모델과 커플 스코프 API
+
+
+## P0 규칙형 추천 시도 원장
+
+`DecisionRecommendationAttempt`: `id`, `decision_id`(unique), `requested_by_id`, `outcome`(`selected`/`no_match`), `candidate_id`(nullable), `created_at`. 같은 Decision에서 추천 평가를 성공/실패와 관계없이 한 번만 허용하여 조건 역추정 반복을 제한한다. 점수·비공개 조건·제출 후보 목록은 저장하지 않는다.
+
+기존 `DecisionCondition.max_budget`는 **각자가 허용하는 2인 총액 상한**이고 후보의 `estimated_total_cost_krw`와 각각 비교한다. 기존 저장값의 의미·단위는 자동 마이그레이션하지 않으므로 별도 확인이 필요하다. `Base.metadata.create_all`은 신규 테이블만 만들며 기존 DB를 삭제하지 않는다. 운영 백업·마이그레이션·병렬 요청 원자성은 후속 과제다.

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class MessageCreate(BaseModel):
@@ -125,6 +125,56 @@ class DecisionCandidateRead(BaseModel):
     is_current: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RecommendationOption(BaseModel):
+    title: str = Field(min_length=1, max_length=180)
+    estimated_total_cost_krw: int = Field(ge=0, le=1_000_000_000)
+    time_slot: str = Field(min_length=1, max_length=100)
+    tags: list[str] = Field(default_factory=list, max_length=12)
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, values: list[str]) -> list[str]:
+        cleaned = []
+        seen = set()
+        for value in values:
+            text = value.strip()
+            if not text or len(text) > 60:
+                raise ValueError("Each tag must be 1-60 nonblank characters")
+            key = text.casefold()
+            if key in seen:
+                raise ValueError("Duplicate option tag")
+            seen.add(key)
+            cleaned.append(text)
+        return cleaned
+
+    @model_validator(mode="after")
+    def check_text(self):
+        if not self.title.strip() or not self.time_slot.strip():
+            raise ValueError("Title and time slot must not be blank")
+        return self
+
+
+class RecommendationCreate(BaseModel):
+    options: list[RecommendationOption] = Field(min_length=2, max_length=8)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def unique_titles(self):
+        keys = [item.title.casefold() for item in self.options]
+        if len(keys) != len(set(keys)):
+            raise ValueError("Recommendation option titles must be unique")
+        return self
+
+
+class RecommendationRead(BaseModel):
+    policy_version: str
+    message: str
+    candidate: DecisionCandidateRead
 
 
 class DecisionApprovalRead(BaseModel):
