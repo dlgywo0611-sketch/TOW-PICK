@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="/static/styles.css" />
     <script src="/static/petdock-bridge.js" defer></script>
     <script src="/static/app.js" defer></script>
+    <script src="/static/decision-flow-logic.js" defer></script>
+    <script src="/static/decision-flow.js" defer></script>
   </head>
   <body>
     <header class="topbar">
@@ -32,8 +34,8 @@
         <nav aria-label="진행 단계">
           <div class="step active"><span>01</span><strong>로그인</strong></div>
           <div class="step" id="nav-couple"><span>02</span><strong>커플 연결</strong></div>
-          <div class="step disabled"><span>03</span><strong>조건 입력</strong></div>
-          <div class="step disabled"><span>04</span><strong>공동 결정</strong></div>
+          <div class="step disabled" id="nav-conditions"><span>03</span><strong>조건 입력</strong></div>
+          <div class="step disabled" id="nav-decision"><span>04</span><strong>공동 결정</strong></div>
         </nav>
         <div class="privacy-note">
           <i></i>
@@ -128,6 +130,105 @@
               <button id="refresh-couple-button" class="refresh-button" type="button">연결 상태 새로고침</button>
             </div>
           </article>
+
+          <!-- TWO-PICK P0 shared decision workflow; PET DOCK remains independent. -->
+          <section id="decision-workspace" class="decision-workspace hidden" aria-labelledby="decision-workspace-heading">
+            <header class="decision-heading">
+              <div>
+                <p class="eyebrow coral">STEP 03 & 04 · TWO PICK</p>
+                <h3 id="decision-workspace-heading">둘이 함께 결정해요.</h3>
+                <p>각자 조건을 비공개로 제출하고, 같은 최신 후보에 직접 승인하면 결정이 확정됩니다.</p>
+              </div>
+              <button id="decision-refresh" class="decision-secondary" type="button">결정·상태 새로고침</button>
+            </header>
+
+            <div class="decision-top-grid">
+              <form id="decision-create-form" class="decision-card">
+                <h4>1. 새로운 결정</h4>
+                <label for="new-decision-title">무엇을 함께 정할까요?</label>
+                <input id="new-decision-title" name="title" maxlength="200" required placeholder="예: 이번 주말 데이트" />
+                <button class="decision-primary" type="submit">공동결정 시작하기</button>
+              </form>
+
+              <section class="decision-card" aria-labelledby="decision-history-heading">
+                <h4 id="decision-history-heading">우리 결정 목록</h4>
+                <div id="decision-list" class="decision-list" aria-live="polite">새로운 결정을 시작해 주세요.</div>
+              </section>
+            </div>
+
+            <p id="decision-empty" class="decision-empty">결정을 하나 만들거나 목록에서 선택하면 조건 입력과 추천 화면이 열립니다.</p>
+
+            <div id="decision-detail-body" class="hidden">
+              <div class="decision-current-bar">
+                <div>
+                  <span class="eyebrow">선택한 결정</span>
+                  <strong id="decision-current-title">-</strong>
+                </div>
+                <span id="decision-current-state" class="decision-status-tag">진행 중</span>
+              </div>
+
+              <div class="decision-top-grid">
+                <form id="decision-condition-form" class="decision-card">
+                  <h4>2. 나의 비공개 조건</h4>
+                  <p class="decision-help">상대방은 상세 내용을 볼 수 없고 제출 여부만 확인할 수 있어요. 예산은 <strong>2인 총액 상한</strong>입니다.</p>
+                  <label for="decision-max-budget">내가 허용하는 2인 총액 상한 (원)</label>
+                  <input id="decision-max-budget" name="max_budget" type="number" min="0" max="1000000000" step="1" required placeholder="예: 50000" />
+                  <label for="decision-available-time">가능한 시간 슬롯</label>
+                  <textarea id="decision-available-time" name="available_time" rows="2" maxlength="200" required placeholder="예: 토 18:00-20:00"></textarea>
+                  <label for="decision-preferences">선호 태그 (쉼표로 구분)</label>
+                  <textarea id="decision-preferences" name="preferences" rows="2" maxlength="1000" placeholder="예: 한식, 조용한 곳"></textarea>
+                  <label for="decision-avoidances">회피 태그 (쉼표로 구분)</label>
+                  <textarea id="decision-avoidances" name="avoidances" rows="2" maxlength="1000" placeholder="예: 매운 음식, 긴 대기"></textarea>
+                  <p class="decision-help">시간과 태그는 후보와 <strong>문자열이 정확히 일치</strong>해야 합니다. 첫 후보가 만들어지면 조건을 수정할 수 없어요.</p>
+                  <button id="decision-save-condition" class="decision-primary" type="submit">내 조건 저장하기</button>
+                </form>
+
+                <section class="decision-card" aria-labelledby="decision-submit-title">
+                  <h4 id="decision-submit-title">조건 제출 현황</h4>
+                  <p id="decision-submit-count" class="decision-help">제출 현황을 확인하고 있어요.</p>
+                  <ul id="decision-submit-members" class="decision-member-list"></ul>
+                  <p class="decision-privacy-hint">상대방의 예산, 시간, 선호·회피 조건과 개인별 추천 점수는 공유되지 않습니다.</p>
+                </section>
+              </div>
+
+              <form id="decision-recommend-form" class="decision-card decision-wide">
+                <div class="decision-card-heading">
+                  <div>
+                    <h4>3. 균형 추천</h4>
+                    <p class="decision-help">공개해도 되는 시연용 후보 2~8개를 입력해요. 입력한 예상 가격은 실제 가격이 아니며 예약 여부도 확인되지 않습니다.</p>
+                  </div>
+                  <button id="decision-add-option" class="decision-secondary" type="button">+ 후보 추가</button>
+                </div>
+                <div id="decision-options" class="decision-options"></div>
+                <p class="decision-help">후보 시간은 두 사람이 저장한 시간 슬롯 중 공통으로 일치하는 값을 입력해야 해요. 추천 결과로 상대방의 비공개 조건을 유추하려고 하지 마세요.</p>
+                <label class="decision-consent">
+                  <input id="decision-one-shot-consent" type="checkbox" required />
+                  <span>추천 평가는 결정당 한 번만 가능하며, 적합한 후보가 없어도 횟수가 소진됨을 이해했습니다.</span>
+                </label>
+                <button id="decision-recommend-button" class="decision-primary" type="submit">균형 추천 실행하기 (1회)</button>
+              </form>
+
+              <div class="decision-top-grid">
+                <section class="decision-card" aria-labelledby="decision-result-heading">
+                  <h4 id="decision-result-heading">4. 최신 후보 · 승인</h4>
+                  <p id="decision-candidate-text" class="decision-candidate-text">아직 후보가 없어요.</p>
+                  <p id="decision-approval-count" class="decision-help">승인 0/2</p>
+                  <ul id="decision-approval-members" class="decision-member-list"></ul>
+                  <button id="decision-approve-button" class="decision-primary" type="button" disabled>이 후보 승인하기</button>
+                  <p class="decision-help">반드시 각자 로그인한 계정에서 승인해야 해요. PET DOCK 버튼은 승인에 사용하지 않습니다.</p>
+                </section>
+
+                <form id="decision-manual-form" class="decision-card">
+                  <h4>후보 직접 제안·변경</h4>
+                  <p class="decision-help">추천 결과가 없거나 다른 대안을 제안하고 싶다면 직접 후보를 추가할 수 있어요.</p>
+                  <label for="decision-manual-content">함께 확인할 후보 내용</label>
+                  <textarea id="decision-manual-content" name="content" rows="4" maxlength="500" required placeholder="예: 공원 산책 / 토 18:00-20:00 / 2인 총액 0원 (확인 필요)"></textarea>
+                  <button id="decision-manual-button" class="decision-secondary" type="submit">수동 후보 등록하기</button>
+                  <p class="decision-help">새 버전의 후보로 변경하면 이전 후보에 대한 승인은 새 후보로 승계되지 않습니다.</p>
+                </form>
+              </div>
+            </div>
+          </section>
 
           <section class="petdock-panel" aria-labelledby="petdock-title">
             <header class="petdock-heading">

@@ -44,6 +44,16 @@ const errorMessages = {
   'User does not belong to a couple': '아직 커플에 연결되지 않았습니다.',
   'Could not validate credentials': '로그인이 만료되었습니다. 다시 로그인해 주세요.',
   'Token has been revoked': '로그아웃된 세션입니다. 다시 로그인해 주세요.',
+  'Conditions not found': '아직 내 조건을 제출하지 않았어요.',
+  'Conditions cannot be changed after candidate creation': '후보가 생성된 뒤에는 개인 조건을 수정할 수 없어요.',
+  'Both couple members must submit conditions before recommendation': '두 사람이 모두 조건을 제출해야 추천할 수 있어요.',
+  'Both couple members must submit conditions before candidate creation': '두 사람이 모두 조건을 제출해야 후보를 만들 수 있어요.',
+  'Recommendation already attempted for this decision': '이 결정의 추천 기회는 이미 사용했어요. 수동 후보를 등록할 수 있어요.',
+  'No mutually suitable option; try a manual candidate': '두 사람이 함께 수용할 추천 후보가 없어요. 추천 기회는 소진됐고 수동 후보를 등록할 수 있어요.',
+  'Recommendation only available before first candidate': '추천은 첫 후보를 만들기 전에 한 번만 사용할 수 있어요.',
+  'Decision is already closed': '이미 확정된 결정이에요.',
+  'User already approved this candidate': '이미 승인한 후보예요.',
+  'Only the current candidate can be approved': '최신 후보만 승인할 수 있어요.',
 };
 
 function showAlert(message, success = false) {
@@ -88,7 +98,9 @@ async function api(path, options = {}) {
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     const detail = payload.detail || '요청을 처리하지 못했습니다.';
-    throw new Error(errorMessages[detail] || detail);
+    const message = Array.isArray(detail) ? '입력값을 확인해 주세요.' :
+      (errorMessages[detail] || String(detail));
+    throw new Error(message);
   }
   return response.status === 204 ? null : response.json();
 }
@@ -114,7 +126,10 @@ function render() {
   document.querySelector('.step:first-child').classList.toggle('complete', authenticated);
   document.querySelector('.step:first-child').classList.toggle('active', !authenticated);
 
-  if (!authenticated) return;
+  if (!authenticated) {
+    window.dispatchEvent(new Event('twopick:session-changed'));
+    return;
+  }
   elements.profileName.textContent = state.user.nickname;
   elements.profileAvatar.textContent = state.user.nickname.slice(0, 1).toUpperCase();
   elements.logoutButton.setAttribute('aria-label', `${state.user.nickname}님 로그아웃`);
@@ -126,7 +141,10 @@ function render() {
   elements.coupleStatus.classList.toggle('online', connected);
   elements.coupleStatus.innerHTML = `<i></i> ${connected ? '연결됨' : hasCouple ? '상대 대기' : '연결 전'}`;
 
-  if (!hasCouple) return;
+  if (!hasCouple) {
+    window.dispatchEvent(new Event('twopick:session-changed'));
+    return;
+  }
   const me = state.couple.members.find((member) => member.id === state.user.id) || state.user;
   const partner = state.couple.members.find((member) => member.id !== state.user.id);
   elements.memberA.textContent = me.nickname.slice(0, 1);
@@ -136,6 +154,7 @@ function render() {
     : '초대 코드를 상대방에게 전달해 주세요.';
   elements.connectedCode.textContent = state.couple.invite_code;
   elements.refreshCoupleButton.classList.toggle('hidden', connected);
+  window.dispatchEvent(new Event('twopick:session-changed'));
 }
 
 async function loadCurrentSession() {
