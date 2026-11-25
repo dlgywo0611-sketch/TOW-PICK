@@ -604,7 +604,8 @@ SQLite의 경쟁 쓰기는 `BEGIN IMMEDIATE`로 직렬화한다. 현재 후보�
 | 경험치 및 중복 지급 방지 | planned | endpoint/schema 없음 |
 | 기념일·일정 | implemented (backend) | `/schedules` CRUD; 웹 UI 연결 미검증 |
 | 알림 동의·작업 원장 | partial | `GET/PUT /notifications/settings/me`, 내부 작업 예약·취소; 실제 발송 없음 |
-| n8n 실제 연동·메일 발송 | planned | Webhook/발송 endpoint·workflow 없음 |
+| n8n 입력 검증 Test Webhook | partial | 로컬 Test URL용 Python CLI; FastAPI 공개 endpoint 아님 |
+| n8n 운영 연동·메일 발송 | planned | 운영 발송 endpoint·scheduler·Gmail workflow 없음 |
 | PET 이벤트 영속화 | planned | Web Serial/BLE 이벤트 저장 API 없음 |
 
 ## 11. 기타 현재 구현된 endpoint
@@ -711,6 +712,6 @@ SQLite의 datetime 응답에 timezone offset이 보존된다고 가정하지 않
  "send_time": "09:00:00"}
 ```
 
-응답에는 `user_id`, `policy_version`(`care_reminder_v1`), `consented_at`, `withdrawn_at`, `timezone`(`Asia/Seoul`)이 포함된다. 저장 전 GET은 `consent=false`, 두 종류 선택값 false, 09:00을 반환하며 동의 및 알림 종류 선택 전에는 예약하지 않는다. 한 사람의 설정 변경은 상대방 설정에 영향을 주지 않는다. 서버는 동의한 사람의 다음 반복 발생일에 대한 D-1/당일 작업만 내부 원장에 예약한다. 동일 일정·revision·수신자·종류·발생 날짜의 key는 unique다. 철회·일정 변경·삭제는 pending 작업을 취소한다. 아직 n8n 전송 API, 실제 Webhook 호출, Gmail 발송, 실행 worker, 재시도 처리는 없다. 내부 mock payload 생성은 최신 동의와 revision을 재확인하며 비공개 조건·JWT를 포함하지 않는다.
+응답에는 `user_id`, `policy_version`(`care_reminder_v1`), `consented_at`, `withdrawn_at`, `timezone`(`Asia/Seoul`)이 포함된다. 저장 전 GET은 `consent=false`, 두 종류 선택값 false, 09:00을 반환하며 동의 및 알림 종류 선택 전에는 예약하지 않는다. 한 사람의 설정 변경은 상대방 설정에 영향을 주지 않는다. 서버는 동의한 사람의 다음 반복 발생일에 대한 D-1/당일 작업만 내부 원장에 예약한다. 동일 일정·revision·수신자·종류·발생 날짜의 key는 unique다. 철회·일정 변경·삭제는 pending 작업을 취소한다. 입력 검증 Test Webhook으로의 격리 DB CLI 호출만 추가됐으며, 운영 n8n 발송 API, Gmail 발송, 실행 worker, 재시도 처리는 없다. 내부 mock payload 생성은 최신 동의와 revision을 재확인하며 비공개 조건·JWT를 포함하지 않는다.
 
 프론트엔드는 기존 인증·커플·Decision 호출을 유지하고 새 화면에서 위 경로를 연결한다. Mock 일정 필드는 `date → local_date`, `time → local_time`, `type → kind`, `repeat → repeat_rule`로 변환해야 하며 실제 프론트 Mock 필드명은 연동 시 확인한다. 이 절의 매핑은 제안이며 현재 프론트 코드의 확정 스키마를 뜻하지 않는다.
