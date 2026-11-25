@@ -1,59 +1,59 @@
-# 신규 프론트 화면 API 연동 준비
+# 프론트엔드 API 연동 현황
 
-작성 기준: 2026-11-25. 이 문서는 프론트엔드가 필요로 하는 제안 계약이며, 백엔드 합의 전에는 호출하지 않는다. 현재 구현된 인증·커플·공동결정·확정 기록은 실제 API를 사용한다. 일정, 알림, 만족도, OUR PET 성장, 프로필 수정은 화면에 **테스트 데이터/이 기기 저장**으로 표시한다.
+작성 기준: 2026-11-25. 최신 `docs/API_CONTRACT.md`를 기준으로 실제 API와 임시 데이터를 구분한다. API 오류가 발생해도 Mock으로 조용히 대체하지 않으며 사용자에게 오류 상태를 표시한다.
 
-## 데이터 소스 현황
+## 실제 API 연동 완료
 
-| 화면/기능 | 현재 소스 | 연동 상태 |
+| 화면/기능 | API | 상태 |
 |---|---|---|
-| 로그인·회원가입·커플 연결 | API | 연동 완료 |
-| 공동결정·조건·추천·승인 | API | 연동 완료 |
-| 최근 확정 결정 | `GET /decision-confirmations` | 연동 완료 |
-| 만족도 평가 | Mock/localStorage | API 필요 |
-| 기념일·커플 일정 | Mock/localStorage | API 필요 |
-| 알림 센터 | Mock/localStorage | API 필요 |
-| OUR PET 레벨·경험치 | Mock | API 필요 |
-| 개인 프로필·알림 설정 | localStorage | API 필요 |
-| PET DOCK 연결 상태 | 브라우저 Web Serial/Bluetooth | 서버 API 불필요 |
+| 로그인·회원가입·로그아웃 | 인증 API | 완료 |
+| 커플 초대·연결·24시간 만료·재발급 | `POST /couples`, `POST /couples/join`, `POST /couples/invite-code`, `GET /couples/me` | 완료 |
+| 공동결정·비공개 조건·추천·수동 후보·양측 승인 | `/decisions` 계열 | 완료 |
+| 확정 결정 기록 및 상세 | `GET /decision-confirmations`, 필요 시 `GET /decisions/{id}` | 완료 |
+| 본인 만족도 조회·작성·수정 | `GET/PUT /decisions/{id}/feedback/me` | 완료 |
+| 기념일·일정·반복 캘린더 | `GET/POST /schedules`, `GET/PUT/DELETE /schedules/{id}` | 완료 |
+| 본인 알림 동의·철회 및 예약 설정 | `GET/PUT /notifications/settings/me` | 완료 |
+| 대시보드 | 결정·확정 기록·일정·커플·본인 알림 설정 API 조합 | 완료 |
+| PET DOCK 연결 상태 | 브라우저 Web Serial/Web Bluetooth | 서버 API 불필요 |
 
-## 제안 API 계약
+모든 신규 요청은 기존 JWT 인증을 사용한다. 401, 403, 404, 409, 410, 422 응답은 공통 API 오류 처리와 화면별 안내 문구로 구분한다.
 
-### 만족도
+## 아직 임시 데이터 또는 로컬 저장을 사용하는 기능
 
-- `PUT /decision-confirmations/{confirmation_id}/satisfaction`
-- 요청: `{ "score": 1 }` (`1..5`)
-- 응답: `{ "confirmation_id": 10, "score": 1, "updated_at": "ISO-8601" }`
-- 권한: 해당 커플 구성원. 두 사람 점수를 분리 저장하며 상대방 점수 공개 여부는 백엔드/기획 합의가 필요하다.
+| 기능 | 현재 소스 | 필요한 백엔드 |
+|---|---|---|
+| 알림 센터 목록·읽음 상태 | Mock + 이 기기 읽음 상태 | 알림 목록·개별 읽음·전체 읽음 API |
+| OUR PET 레벨·경험치·성장 상태 | Mock | 펫 상태 조회 API |
+| 개인 표시 이름 수정 | 이 기기 저장 | 본인 프로필 수정 API |
+| 실제 이메일 알림 발송 | 미제공으로 명시 | n8n/Gmail 발송 worker 및 결과 정책 |
 
-### 일정
+임시 기능은 `frontend/feature-data.js`의 `TwoPickFeatureData.sources`에서 `mock` 또는 `local`로 표시한다. 실제 API 연동 기능은 `api`로 표시한다.
 
-- `GET /schedules?from=YYYY-MM-DD&to=YYYY-MM-DD`
-- `POST /schedules` 요청: `{ "title": "첫 만남 기념일", "date": "2026-11-26", "type": "anniversary" }`
-- `DELETE /schedules/{schedule_id}`
-- 목록 항목: `{ "id": 1, "title": "...", "date": "YYYY-MM-DD", "type": "anniversary|date|todo", "created_by": 1 }`
-- 권한: 현재 커플 데이터만 조회·변경. 제목 1~100자, 날짜 유효성, type enum 검증 필요.
+## 추가로 필요한 API 제안
 
-### 알림
+### 알림 센터
 
 - `GET /notifications?cursor=<cursor>`
 - `POST /notifications/{notification_id}/read`
 - `POST /notifications/read-all`
-- 목록 응답: `{ "items": [{ "id": 1, "type": "condition|approval|confirmed|schedule", "title": "...", "message": "...", "created_at": "ISO-8601", "read_at": null, "route": "decision" }], "next_cursor": null }`
-- 알림은 사용자별 읽음 상태를 저장하며 비공개 조건 내용 자체는 메시지에 포함하지 않는다.
+- 사용자별 읽음 상태를 저장하고 비공개 조건 내용은 알림에 포함하지 않는다.
 
 ### OUR PET
 
 - `GET /pets/me`
-- 응답: `{ "name": "OUR PET", "level": 3, "experience": 65, "next_level_experience": 100, "status": "happy", "updated_at": "ISO-8601" }`
-- 캐릭터/공간 에셋 계약은 확정 전이며 프론트는 현재 CSS 임시 에셋만 사용한다. 하드웨어 버튼을 공동결정 승인 API와 연결하지 않는다.
+- 최소 응답: `name`, `level`, `experience`, `next_level_experience`, `status`, `updated_at`
+- 캐릭터·공간 에셋 계약은 별도 확정이 필요하다. 하드웨어 버튼은 공동결정 승인 API와 연결하지 않는다.
 
-### 프로필·환경 설정
+### 프로필
 
-- `PATCH /users/me` 요청: `{ "nickname": "새 이름" }`, 응답은 기존 `UserRead`
-- `GET /users/me/preferences`
-- `PUT /users/me/preferences` 요청/응답: `{ "decision_notifications": true, "schedule_notifications": true, "pet_notifications": true }`
-- 계정 삭제 API는 본인 재인증·복구 정책 합의 후 별도 설계한다.
+- `PATCH /users/me` 요청: `{ "nickname": "새 이름" }`
+- 계정 삭제는 재인증·복구 정책 합의 후 별도 설계한다.
 
-## 프론트 연동 방법
+## 연동 원칙
 
-Mock 원본은 `frontend/feature-data.js` 한곳에 있고 `TwoPickFeatureData.sources`로 `api`, `mock`, `local`을 구분한다. 백엔드 계약이 확정되면 해당 기능만 API adapter로 교체하고, 화면 렌더링과 검증 로직은 유지한다. 응답 실패 시 기존 Mock으로 조용히 대체하지 말고 오류 상태를 표시해 실제 장애가 테스트 데이터에 가려지지 않도록 한다.
+- `docs/API_CONTRACT.md`의 실제 필드명과 오류 코드를 따른다.
+- 만족도는 본인 값만 조회·표시하며 상대방 값, 평균, 합계를 노출하지 않는다.
+- 일정은 `Asia/Seoul` 현지 날짜·시간과 반복 규칙을 그대로 표시한다.
+- 알림 설정 저장을 실제 발송 완료로 표현하지 않는다.
+- 시연용 추천 가격은 확인된 실제 가격처럼 표시하지 않는다.
+- 백엔드가 없는 기능은 Mock 또는 이 기기 저장임을 화면에 표시한다.
