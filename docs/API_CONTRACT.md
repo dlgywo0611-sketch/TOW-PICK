@@ -161,6 +161,7 @@ OAuth2 form의 `grant_type`, `scope`, `client_id`, `client_secret`도 schema에 
 | Method | Path | Auth | Request | Success | 주요 Error |
 |---|---|---|---|---|---|
 | POST | `/couples` | Bearer | 없음 | 201 `CoupleRead` | 401 인증 실패, 409 이미 커플 가입 |
+| POST | `/couples/invite-code` | Bearer | 없음 | 200 `CoupleRead` | 401, 409 미가입·이미 2명 |
 | POST | `/couples/join` | Bearer | JSON `CoupleJoin` | 200 `CoupleRead` | 401, 404 코드 없음, 409 이미 가입·정원 초과, 422 |
 | GET | `/couples/me` | Bearer | 없음 | 200 `CoupleRead` | 401, 404 커플 미가입·커플 없음 |
 
@@ -186,6 +187,7 @@ Body 없이 호출한다. 로그인 사용자가 속할 새 Couple을 만들고 
 ```
 
 - 초대 코드는 서버가 생성하는 대문자 8자리 hexadecimal 문자열이다.
+- 신규 코드는 발급 후 24시간 유효하다. 한 명만 연결된 커플의 구성원은 `POST /couples/invite-code`로 재발급할 수 있으며 이전 코드는 즉시 무효다. 발급 시각을 알 수 없는 기존 코드는 만료로 취급하고 재발급한다.
 - 이미 `couple_id`가 있는 사용자는 409 `User already belongs to a couple`이다.
 
 ### 3.2 초대 코드 참여 — `POST /couples/join`
@@ -226,6 +228,7 @@ Body 없이 호출한다. 로그인 사용자가 속할 새 Couple을 만들고 
 - 404 `Invite code not found`
 - 409 `User already belongs to a couple`
 - 409 `Couple already has two members`
+- 410 `Invite code expired or inactive`
 - 422 `invite_code` 누락
 
 서버는 입력 코드를 대문자로 바꾸지만 공백을 제거하지 않는다. 현재 프론트는 호출 전에 `trim().toUpperCase()`를 적용한다.
@@ -540,7 +543,7 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 9. `confirmed` 이후 Candidate 생성과 추가 승인은 409 `Decision is already closed`로 차단된다.
 10. 과거 Candidate 목록을 조회하는 endpoint는 현재 없다. 상세 응답은 최신 current Candidate만 제공한다.
 
-현재 코드는 정상적인 순차 요청 흐름을 구현한다. 동시 Candidate 생성과 동시 승인·확정의 원자성 보강은 별도 백엔드 과제이며 프론트가 중복 클릭을 막더라도 서버 보강을 대체하지 않는다.
+SQLite의 경쟁 쓰기는 `BEGIN IMMEDIATE`로 직렬화한다. 현재 후보는 DB 부분 unique index, 후보 version·승인·확정 기록은 DB unique 제약으로 보호한다. 서로 다른 연결의 병렬 요청 자동 테스트는 통과했으며 별도 프로세스·운영 부하 검증은 남아 있다.
 
 ## 8. 커플 데이터 접근 규칙
 
@@ -586,21 +589,23 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 - 현재 API에는 CORS 설정이 없다. 별도 프론트 dev server를 사용하면 same-origin proxy가 필요하다.
 - 하드웨어 버튼 이벤트를 승인 버튼 handler와 연결하지 않는다.
 
-## 10. planned API 목록
+## 10. 확장 기능 구현 상태
 
-다음 영역은 현재 모델 또는 endpoint가 없으며 구체적인 Method, Path, 요청·응답 schema도 확정되지 않았다. 프론트에서 임의 endpoint를 가정하지 않는다.
+다음 표의 `planned` 영역은 현재 모델·endpoint가 없다. `implemented`와 `partial`의 실제 경로는 아래 2차 계약을 따른다. 프론트에서 미구현 endpoint를 임의로 가정하지 않는다.
 
 | 영역 | 상태 | 현재 계약 |
 |---|---|---|
 | 두 사용자 조건 기반 규칙형 추천 | implemented (P0 rules) | `POST /decisions/{decision_id}/recommendations` — 신규 후보 v1 생성, 가격·시간은 시연용 |
 | Candidate 자동 생성·추천 | partial | 사용자 입력 시연용 옵션의 규칙형 추천 v1 생성 가능. 자동 실매장 검색/가격 확인/AI 추천은 미구현 |
 | 별도 최종 결정 기록 | implemented (신규 확정 건) | `GET /decision-confirmations`; 양측 승인 시 스냅샷 1건 저장. 과거 확정 건은 자동 이관하지 않음 |
-| 만족도·간단 피드백 | planned | endpoint/schema 없음 |
+| 만족도·간단 피드백 | implemented | `GET/PUT /decisions/{decision_id}/feedback/me` |
 | OUR PET 상태·성장 | planned | endpoint/schema 없음 |
 | 생일 월·일 기반 OUR PET 배정 | planned | 곰·토끼 배정 규칙만 확정, endpoint/schema 없음 |
 | 경험치 및 중복 지급 방지 | planned | endpoint/schema 없음 |
-| 기념일·일정 | planned | endpoint/schema 없음 |
-| n8n 알림 연동 | planned | endpoint/schema 없음 |
+| 기념일·일정 | implemented (backend) | `/schedules` CRUD; 웹 UI 연결 미검증 |
+| 알림 동의·작업 원장 | partial | `GET/PUT /notifications/settings/me`, 내부 작업 예약·취소; 실제 발송 없음 |
+| n8n 입력 검증 Test Webhook | partial | 로컬 Test URL용 Python CLI; FastAPI 공개 endpoint 아님 |
+| n8n 운영 연동·메일 발송 | planned | 운영 발송 endpoint·scheduler·Gmail workflow 없음 |
 | PET 이벤트 영속화 | planned | Web Serial/BLE 이벤트 저장 API 없음 |
 
 ## 11. 기타 현재 구현된 endpoint
@@ -625,7 +630,7 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 - `frontend/app.js`의 실제 7개 API 경로, Body 형식, 토큰 저장·헤더 처리를 대조했다.
 - 현재 프론트가 호출하는 인증·커플 endpoint의 Method, Path, Body는 백엔드와 일치한다.
 - 공동결정 backend endpoint는 구현되어 있지만 현재 프론트에는 연결되지 않았다.
-- 개인 조건·규칙형 추천 API는 구현되어 있으며 프론트 연결 코드는 신규로 추가되었다. OUR PET, 경험치, 일정, PET 이벤트 영속화는 `planned`다. 브라우저 E2E 및 실가격 확인은 미검증이다.
+- 개인 조건·규칙형 추천 API와 프론트 연결 코드는 기존 구현이다. 2차 백엔드에서 일정 API를 추가했으며 OUR PET, 경험치, PET 이벤트 영속화는 여전히 `planned`다. 브라우저 E2E 및 실가격 확인은 미검증이다.
 
 
 ## P0 규칙형 균형 추천 API
@@ -639,7 +644,7 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 - 적합 후보 없음도 시도 원장에 저장되어 동일 Decision에서 재추천 불가하다. 수동 후보 생성은 가능하다.
 - 응답은 추천 후보와 버전만 포함하며 상대방 조건·개인 점수·탈락 이유는 노출하지 않는다.
 - 상세 계약, 오류 코드, 가격 미검증 주의는 [`BALANCED_RECOMMENDATIONS.md`](BALANCED_RECOMMENDATIONS.md) 참조.
-- 실제 브라우저 UI, 실가격 검증, 동시 요청 원자성은 미구현/미검증 상태다.
+- 실제 브라우저 UI·실가격 검증은 미검증이며, 2차 백엔드의 별도 SQLite 연결 동시 요청 테스트는 통과했다. 별도 프로세스 부하 시험은 남아 있다.
 
 ## 2026-11-25 추가 계약 — 확정 이력
 
@@ -655,3 +660,58 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 ```
 
 SQLite의 datetime 응답에 timezone offset이 보존된다고 가정하지 않는다. 기존에 기록 없이 확정된 Decision은 이 목록에 자동으로 나타나지 않으므로 기존 `/decisions` 및 `/decisions/{decision_id}` 조회를 계속 사용한다. 상대방의 비공개 조건은 이력 응답에 포함되지 않는다. 프론트엔드와 n8n 연동 주의사항은 [`BACKEND_INTEGRATION_20261125.md`](BACKEND_INTEGRATION_20261125.md)에 정리했다.
+
+## 2026-11-25 2차 백엔드 계약
+
+모든 경로는 유효한 Bearer JWT가 필요하다. 다음 표의 Body에 `user_id`와 `couple_id`는 없다. 서버가 인증 사용자와 연결 커플을 기준으로 권한을 판단한다.
+
+| Method | Path | Request | Success | 주요 Error |
+|---|---|---|---|---|
+| POST | `/couples/invite-code` | 없음 | 200 `CoupleRead` | 401, 409 미가입·2명 연결 |
+| GET | `/decisions/{decision_id}/feedback/me` | 없음 | 200 `DecisionFeedbackRead` | 401, 403 타 커플, 404 기록 없음, 409 미가입 |
+| PUT | `/decisions/{decision_id}/feedback/me` | `score` 정수 1~5, `comment` null 또는 최대 500자 | 200 `DecisionFeedbackRead` | 401, 403, 404 Decision 없음, 409 미확정, 422 |
+| POST | `/schedules` | `CoupleScheduleInput` | 201 `CoupleScheduleRead` | 401, 409 미가입, 422 |
+| GET | `/schedules` | 없음 | 200 `CoupleScheduleRead[]` | 401, 409 미가입 |
+| GET | `/schedules/{schedule_id}` | 없음 | 200 `CoupleScheduleRead` | 401, 403 타 커플, 404 없음 |
+| PUT | `/schedules/{schedule_id}` | 전체 `CoupleScheduleInput` | 200 `CoupleScheduleRead`, revision +1 | 401, 403, 404, 422 |
+| DELETE | `/schedules/{schedule_id}` | 없음 | 204, Body 없음 | 401, 403, 404 |
+| GET | `/notifications/settings/me` | 없음 | 200 `NotificationSettingRead` | 401 |
+| PUT | `/notifications/settings/me` | `consent`, 선택 `d1_enabled`, `day_of_enabled`, `send_time` | 200 `NotificationSettingRead` | 401, 422 |
+
+`POST /couples/join`은 발급 후 24시간이 지났거나 사용된 현재 코드에 410을 돌려준다. 재발급으로 교체된 옛 코드와 존재하지 않는 코드는 404, 정원 초과는 409다. `GET /couples/me`의 응답 형태는 그대로다. 현재 요청 제한 장치는 없으므로 초대 코드 대입 공격 방지를 위한 배포 계층 rate limit이 후속 과제다.
+
+추천 결과가 `No mutually suitable option; try a manual candidate` 409일 때도 추천 시도는 소비된다. 해당 Decision의 조건 수정과 재추천은 409다. UI는 수동 Candidate 등록 또는 새 Decision 시작을 제시한다. 수동 Candidate는 추천의 필수 조건 검증을 통과했다고 표시해서는 안 되며 양측 명시 승인으로만 확정된다.
+
+피드백 예시:
+
+```json
+{"score": 4, "comment": "다음에는 조금 더 일찍 출발하고 싶어요"}
+```
+
+```json
+{"id": 7, "decision_id": 12, "user_id": 3, "score": 4,
+ "comment": "다음에는 조금 더 일찍 출발하고 싶어요",
+ "created_at": "2026-11-25T01:00:00", "updated_at": "2026-11-25T01:00:00"}
+```
+
+피드백은 확정된 결정에만 저장한다. 상대방의 점수·의견·집계값을 제공하는 경로는 없다.
+
+일정 Body 예시 (`POST`와 `PUT` 동일):
+
+```json
+{"title": "기념일", "kind": "anniversary", "local_date": "2027-02-28",
+ "local_time": null, "repeat_rule": "yearly"}
+```
+
+응답에는 `id`, `couple_id`, `created_by_id`, 위 입력 필드, `revision`(최초 1), `timezone`(`Asia/Seoul`)이 추가된다. `kind`는 `schedule`/`anniversary`이고 일반 일정 반복은 `none`/`weekly`/`monthly`/`yearly`, 기념일은 `none`/`yearly`다. `repeat_rule` 생략 시 각각 `none`, `yearly`다. `local_time`이 null이면 종일 일정이며 시간 값은 한국 현지 시각(`HH:MM:SS`, offset 없음)이다. 월말과 윤년 반복은 해당 월의 마지막 날로 조정하며 다음 반복은 원래 등록일을 기준으로 계산한다. 삭제는 원장 참조 보존을 위한 soft delete이며 조회에서 제외된다.
+
+알림 설정 Body 예시:
+
+```json
+{"consent": true, "d1_enabled": true, "day_of_enabled": false,
+ "send_time": "09:00:00"}
+```
+
+응답에는 `user_id`, `policy_version`(`care_reminder_v1`), `consented_at`, `withdrawn_at`, `timezone`(`Asia/Seoul`)이 포함된다. 저장 전 GET은 `consent=false`, 두 종류 선택값 false, 09:00을 반환하며 동의 및 알림 종류 선택 전에는 예약하지 않는다. 한 사람의 설정 변경은 상대방 설정에 영향을 주지 않는다. 서버는 동의한 사람의 다음 반복 발생일에 대한 D-1/당일 작업만 내부 원장에 예약한다. 동일 일정·revision·수신자·종류·발생 날짜의 key는 unique다. 철회·일정 변경·삭제는 pending 작업을 취소한다. 입력 검증 Test Webhook으로의 격리 DB CLI 호출만 추가됐으며, 운영 n8n 발송 API, Gmail 발송, 실행 worker, 재시도 처리는 없다. 내부 mock payload 생성은 최신 동의와 revision을 재확인하며 비공개 조건·JWT를 포함하지 않는다.
+
+프론트엔드는 기존 인증·커플·Decision 호출을 유지하고 새 화면에서 위 경로를 연결한다. Mock 일정 필드는 `date → local_date`, `time → local_time`, `type → kind`, `repeat → repeat_rule`로 변환해야 하며 실제 프론트 Mock 필드명은 연동 시 확인한다. 이 절의 매핑은 제안이며 현재 프론트 코드의 확정 스키마를 뜻하지 않는다.
