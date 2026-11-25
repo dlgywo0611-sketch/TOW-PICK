@@ -1,0 +1,83 @@
+{
+  "name": "TWO PICK - 01 Webhook Test",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "two-pick-test",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4b24a83f-ef0c-434f-a4ef-79c286253673",
+      "name": "Webhook 요청 수신",
+      "webhookId": "29ccf164-2cb3-41ad-a533-510bc4b82d24"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst errors = [];\n\nconst required = [\n  'job_id',\n  'schedule_id',\n  'notification_type',\n  'occurrence_date',\n  'send_at',\n  'recipient_email',\n  'dedupe_key',\n  'message'\n];\n\nconst data = body && typeof body === 'object'\n  && !Array.isArray(body) ? body : {};\n\nfor (const field of required) {\n  if (data[field] === undefined ||\n      data[field] === null ||\n      data[field] === '') {\n    errors.push(`Missing field: ${field}`);\n  }\n}\n\nfor (const field of Object.keys(data)) {\n  if (!required.includes(field)) {\n    errors.push(`Unexpected field: ${field}`);\n  }\n}\n\nfor (const field of ['job_id', 'schedule_id']) {\n  if (!Number.isInteger(data[field]) || data[field] <= 0) {\n    errors.push(`Invalid ${field}`);\n  }\n}\n\nif (!['d1', 'day_of'].includes(data.notification_type)) {\n  errors.push('Invalid notification_type');\n}\n\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data.occurrence_date || '') ||\n    Number.isNaN(Date.parse(data.occurrence_date))) {\n  errors.push('Invalid occurrence_date');\n}\n\nif (Number.isNaN(Date.parse(data.send_at))) {\n  errors.push('Invalid send_at');\n}\n\nif (!/^[^@\\s]+@example\\.test$/i.test(data.recipient_email || '')) {\n  errors.push('Use a test email address');\n}\n\nif (!/^[a-f0-9]{64}$/.test(data.dedupe_key || '')) {\n  errors.push('Invalid dedupe_key');\n}\n\nif (typeof data.message !== 'string' ||\n    !data.message.trim()) {\n  errors.push('Invalid message');\n}\n\nreturn [{\n  json: {\n    success: errors.length === 0,\n    service: 'TWO PICK',\n    mode: 'webhook_test',\n    status_code: errors.length === 0 ? 200 : 400,\n    message: errors.length === 0\n      ? 'Webhook received successfully'\n      : 'Validation failed',\n    errors,\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "f295446f-c5d5-4b10-8ac5-d8e2394f6004",
+      "name": "알림 데이터 검증"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": "={{ $json.status_code }}"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "0d492ea6-3fcc-4879-bed4-1a249a98ced7",
+      "name": "검증 결과 반환"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook 요청 수신": {
+      "main": [
+        [
+          {
+            "node": "알림 데이터 검증",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "알림 데이터 검증": {
+      "main": [
+        [
+          {
+            "node": "검증 결과 반환",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
