@@ -1,20 +1,16 @@
 (() => {
   'use strict';
   const logic = globalThis.TwoPickNotificationLogic;
+  const data = globalThis.TwoPickFeatureData;
   const root = document.querySelector('#notification-center');
   const openButton = document.querySelector('#notification-button');
-  if (!logic || !root || !openButton) return;
+  if (!logic || !data || !root || !openButton) return;
   const ui = {
     badge: document.querySelector('#notification-badge'), list: root.querySelector('#notification-list'),
     close: root.querySelector('#notification-close'), backdrop: root.querySelector('#notification-backdrop'),
     readAll: root.querySelector('#notification-read-all'),
   };
-  const items = [
-    { id: 'condition', type: 'condition', title: '상대방이 조건을 제출했어요', message: '공동결정 화면에서 후보 추천을 이어갈 수 있어요.', created_at: '2026-11-25T09:30:00', route: 'decision' },
-    { id: 'approval', type: 'approval', title: '후보 승인을 기다리고 있어요', message: '최신 후보를 확인하고 내 계정에서 직접 승인해 주세요.', created_at: '2026-11-25T08:40:00', route: 'decision' },
-    { id: 'confirmed', type: 'confirmed', title: '두 사람의 결정이 확정됐어요', message: '확정된 선택은 기록 화면에서 다시 볼 수 있어요.', created_at: '2026-11-24T20:15:00', route: 'history' },
-    { id: 'schedule', type: 'schedule', title: '내일은 첫 만남 기념일이에요', message: '등록된 일정과 준비할 내용을 확인해 보세요.', created_at: '2026-11-24T09:00:00', route: 'schedule' },
-  ];
+  const items = data.getMockData('notifications');
   let readIds = [];
 
   function storageKey() { return state.user ? `tow_pick_mock_notification_reads_${state.user.id}` : ''; }

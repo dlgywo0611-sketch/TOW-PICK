@@ -1,12 +1,9 @@
 (() => {
   const logic = window.MockFeaturesLogic;
-  if (!logic) return;
+  const data = window.TwoPickFeatureData;
+  if (!logic || !data) return;
 
-  const history = [
-    { id: 'dinner-1', category: 'meal', icon: '🍝', title: '금요일 저녁 메뉴', date: '2026. 11. 20.', result: '동네 파스타 식당', summary: '퇴근 후 가까운 곳에서 천천히 저녁을 먹기로 했어요.' },
-    { id: 'weekend-1', category: 'date', icon: '🌿', title: '주말 데이트', date: '2026. 11. 15.', result: '서울숲 산책', summary: '사람이 적은 오전 시간에 만나 따뜻한 음료와 함께 산책했어요.' },
-    { id: 'movie-1', category: 'home', icon: '🎬', title: '오늘 볼 영화', date: '2026. 11. 8.', result: '어바웃 타임', summary: '집에서 간단한 간식과 함께 다시 보고 싶던 영화를 골랐어요.' },
-  ];
+  const history = data.getMockData('history');
   const ratingKey = 'tow_pick_mock_satisfaction';
   const elements = {
     filter: document.querySelector('#history-filter'), list: document.querySelector('#history-list'),
@@ -73,15 +70,12 @@
 
 (() => {
   const logic = window.MockFeaturesLogic;
+  const data = window.TwoPickFeatureData;
   const form = document.querySelector('#schedule-form');
-  if (!logic || !form) return;
+  if (!logic || !data || !form) return;
 
   const storageKey = 'tow_pick_mock_schedules';
-  const seedEvents = [
-    { id: 'seed-1', title: '우리의 첫 만남 기념일', date: '2026-11-26', type: 'anniversary' },
-    { id: 'seed-2', title: '겨울 전시회 데이트', date: '2026-11-29', type: 'date' },
-    { id: 'seed-3', title: '함께 장보기', date: '2026-12-05', type: 'todo' },
-  ];
+  const seedEvents = data.getMockData('schedules');
   const elements = {
     month: document.querySelector('#calendar-month'), grid: document.querySelector('#calendar-grid'),
     prev: document.querySelector('#calendar-prev'), next: document.querySelector('#calendar-next'),
