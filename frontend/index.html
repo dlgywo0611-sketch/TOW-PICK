@@ -326,7 +326,7 @@
                     <strong id="decision-recommendation-notice-title">추천 결과를 확인해 주세요.</strong>
                     <p id="decision-recommendation-notice-message"></p>
                   </div>
-                  <button id="decision-open-manual" class="decision-secondary" type="button">수동 후보 등록으로 이동</button>
+                  <div class="decision-notice-actions"><button id="decision-open-manual" class="decision-secondary" type="button">수동 후보 등록</button><button id="decision-start-new" class="decision-secondary" type="button">새 공동결정 시작</button></div>
                 </aside>
               </form>
 
@@ -343,7 +343,7 @@
                 <form id="decision-manual-form" class="decision-card" aria-labelledby="decision-manual-heading">
                   <p class="eyebrow coral">MANUAL PICK</p>
                   <h4 id="decision-manual-heading">후보 직접 제안·변경</h4>
-                  <p class="decision-help">추천 결과가 없더라도 결정은 계속할 수 있어요. 두 사람이 함께 확인할 내용을 자유롭게 적어 주세요.</p>
+                  <p class="decision-help">추천 결과가 없더라도 결정은 계속할 수 있어요. 수동 후보도 추천 통과로 간주되지 않으며 두 사람이 각자 승인해야 확정됩니다.</p>
                   <label for="decision-manual-content">함께 확인할 후보 내용</label>
                   <textarea id="decision-manual-content" name="content" rows="4" maxlength="500" required placeholder="예: 공원 산책 / 토 18:00-20:00 / 2인 총액 0원 (확인 필요)"></textarea>
                   <div class="decision-template-row" aria-label="수동 후보 예시">

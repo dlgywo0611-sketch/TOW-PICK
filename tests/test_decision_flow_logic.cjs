@@ -79,6 +79,8 @@ test('recommendation failure exposes a safe manual fallback', () => {
   assert.equal(failed.visible, true);
   assert.equal(failed.canUseManual, true);
   assert.match(failed.message, /추천 후보/);
+  assert.match(failed.message, /조건 수정과 재추천은 불가능/);
+  assert.match(failed.message, /새로운 공동결정/);
   const withCandidate = logic.getRecommendationFallbackState(decision({ id: 3 }), both, true, '실패');
   assert.equal(withCandidate.visible, false);
 });
