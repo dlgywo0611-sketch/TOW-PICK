@@ -122,6 +122,22 @@ class BalancedRecommendationAPITests(unittest.TestCase):
                                  headers=self.headers["b"]).json()
         self.assertTrue(detail["confirmed"])
         self.assertEqual(detail["current_candidate"]["approval_count"], 2)
+        history = self.client.get("/decision-confirmations",
+                                  headers=self.headers["b"])
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(len(history.json()), 1)
+        record = history.json()[0]
+        self.assertEqual(record["decision_id"], self.did)
+        self.assertEqual(record["candidate_id"], cid)
+        self.assertEqual(record["candidate_version"], 1)
+        self.assertEqual(record["content_snapshot"], body["candidate"]["content"])
+        self.assertIsNotNone(record["confirmed_at"])
+        self.assertEqual(self.client.get("/decision-confirmations",
+                                         headers=self.headers["c"]).json(), [])
+        self.assertEqual(self.client.post(f"/candidates/{cid}/approve",
+                                          headers=self.headers["a"]).status_code, 409)
+        with self.sessions() as db:
+            self.assertEqual(db.scalar(select(func.count(models.DecisionConfirmation.id))), 1)
 
     def test_uses_each_persons_ceiling_on_two_person_total(self):
         self.condition("a", 30000)

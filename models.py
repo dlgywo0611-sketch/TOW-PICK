@@ -212,3 +212,20 @@ class DecisionApproval(Base):
         Boolean,
         default=True,
     )
+
+
+class DecisionConfirmation(Base):
+    __tablename__ = "decision_confirmations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    decision_id: Mapped[int] = mapped_column(
+        ForeignKey("decisions.id"), unique=True, nullable=False, index=True,
+    )
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("decision_candidates.id"), nullable=False,
+    )
+    candidate_version: Mapped[int] = mapped_column(nullable=False)
+    content_snapshot: Mapped[str] = mapped_column(String(500), nullable=False)
+    confirmed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False,
+    )

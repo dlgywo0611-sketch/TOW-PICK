@@ -159,7 +159,7 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 
 아래는 설계 방향이며 이번 WBS에서 테이블이나 API를 생성하지 않는다.
 
-### DecisionConfirmation — 최종 결정 기록
+### DecisionConfirmation — 최종 결정 기록 (`implemented`, 2026-11-25)
 
 | 제안 필드 | 목적 |
 |---|---|
@@ -169,7 +169,7 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 | `content_snapshot`, `version` | 이후 후보 데이터 변화와 무관한 최종 기록 |
 | `confirmed_at` | 확정 시각 |
 
-`Decision.status`만 바꾸는 현재 방식에서 최종 후보와 확정 시점을 명시적으로 보존하는 방향이다.
+양측 승인으로 `Decision.status`를 `confirmed`로 바꾸는 트랜잭션에서 후보 ID, version, content snapshot과 확정 시각을 한 건 저장한다. `decision_id` unique로 중복 기록을 막는다. 신규 테이블 생성은 기존 행을 삭제하지 않는다. 이 변경 전에 이미 확정된 Decision에는 기록 행이 자동 생성되지 않으며, 기존 상세 조회는 계속 동작한다. 이력 이관은 백업과 원본 후보 확인 후 별도 수행해야 한다. 동시 승인 원자성은 별도 검증 대상이다.
 
 ### DecisionFeedback — 만족도/간단 피드백
 
