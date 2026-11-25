@@ -72,6 +72,16 @@ test('status view contains only safe status flags', () => {
   assert.deepEqual(status, [{ id: 1, nickname: 'A', submitted: true }, { id: 2, nickname: 'B', submitted: true }]);
   assert.equal(JSON.stringify(status).includes('preferences'), false);
 });
+test('recommendation failure exposes a safe manual fallback', () => {
+  const idle = logic.getRecommendationFallbackState(decision(), both, false, '');
+  assert.equal(idle.visible, false);
+  const failed = logic.getRecommendationFallbackState(decision(), both, true, '추천 후보가 없어요.');
+  assert.equal(failed.visible, true);
+  assert.equal(failed.canUseManual, true);
+  assert.match(failed.message, /추천 후보/);
+  const withCandidate = logic.getRecommendationFallbackState(decision({ id: 3 }), both, true, '실패');
+  assert.equal(withCandidate.visible, false);
+});
 test('web script uses existing auth and decision endpoints, not PET DOCK approval', () => {
   const js = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'decision-flow.js'), 'utf8');
   for (const endpoint of ["'/decisions'", '/conditions/me', '/conditions/status', '/recommendations', '/candidates/', '/approve']) {

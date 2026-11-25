@@ -29,12 +29,17 @@
     addOption: $('#decision-add-option'),
     recommendButton: $('#decision-recommend-button'),
     consent: $('#decision-one-shot-consent'),
+    recommendationNotice: $('#decision-recommendation-notice'),
+    recommendationNoticeTitle: $('#decision-recommendation-notice-title'),
+    recommendationNoticeMessage: $('#decision-recommendation-notice-message'),
+    openManual: $('#decision-open-manual'),
     candidateText: $('#decision-candidate-text'),
     approvalCount: $('#decision-approval-count'),
     approvalMembers: $('#decision-approval-members'),
     approveButton: $('#decision-approve-button'),
     manualForm: $('#decision-manual-form'),
     manualButton: $('#decision-manual-button'),
+    manualInput: $('#decision-manual-content'),
   };
   const flow = {
     key: null,
@@ -45,6 +50,7 @@
     status: null,
     ownConditions: null,
     attempted: new Set(),
+    recommendationError: '',
     busy: false,
   };
 
@@ -116,6 +122,20 @@
         ? '내 승인 완료 · 상대방을 기다려요' : '이 후보 승인하기';
   }
 
+  function renderRecommendationNotice() {
+    const fallback = logic.getRecommendationFallbackState(
+      flow.detail,
+      flow.status,
+      flow.attempted.has(flow.selectedId),
+      flow.recommendationError,
+    );
+    ui.recommendationNotice.classList.toggle('hidden', !fallback.visible);
+    ui.recommendationNotice.classList.toggle('warning', fallback.tone === 'warning');
+    ui.recommendationNoticeTitle.textContent = fallback.title;
+    ui.recommendationNoticeMessage.textContent = fallback.message;
+    ui.openManual.disabled = flow.busy || !fallback.canUseManual;
+  }
+
   function renderDetails() {
     const detail = flow.detail;
     ui.detailBody.classList.toggle('hidden', !flow.selectedId);
@@ -140,6 +160,7 @@
       '후보 생성 후 조건 수정 불가';
     renderMemberStatuses();
     renderApprovals();
+    renderRecommendationNotice();
     const allowRecommendation = logic.canRecommend(detail, flow.status, flow.attempted.has(flow.selectedId));
     ui.recommendButton.disabled = flow.busy || !allowRecommendation;
     ui.addOption.disabled = flow.busy || !allowRecommendation || ui.options.children.length >= 8;
@@ -214,6 +235,7 @@
     flow.detail = null;
     flow.status = null;
     flow.ownConditions = null;
+    flow.recommendationError = '';
     ui.conditionForm.reset();
     resetOptions();
     drawList();
@@ -263,6 +285,7 @@
     flow.detail = null;
     flow.status = null;
     flow.ownConditions = null;
+    flow.recommendationError = '';
     flow.attempted.clear();
     flow.busy = false;
     ui.refresh.disabled = false;
@@ -348,6 +371,16 @@
   });
 
   ui.addOption.addEventListener('click', () => addOptionRow());
+  ui.openManual.addEventListener('click', () => {
+    ui.manualForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    ui.manualInput.focus({ preventScroll: true });
+  });
+  ui.manualForm.addEventListener('click', (event) => {
+    const template = event.target.closest('[data-manual-template]');
+    if (!template) return;
+    ui.manualInput.value = template.dataset.manualTemplate;
+    ui.manualInput.focus();
+  });
   ui.recommendForm.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!logic.canRecommend(flow.detail, flow.status, flow.attempted.has(flow.selectedId))) return;
@@ -363,17 +396,21 @@
       return report(error);
     }
     const id = flow.selectedId;
+    flow.recommendationError = '';
     void action(
       () => api(`/decisions/${id}/recommendations`, { method: 'POST',
         body: JSON.stringify({ options }) }),
       async () => {
         flow.attempted.add(id);
+        flow.recommendationError = '';
         showAlert('균형 추천 후보가 생성됐어요. 두 사람이 각각 승인해야 확정돼요.', true);
         await loadDetail();
       },
       (error) => {
         if (/No mutually suitable option|Recommendation already attempted|추천 기회는 소진|추천 기회는 이미 사용/.test(error.message)) {
           flow.attempted.add(id);
+          flow.recommendationError = error.message;
+          renderDetails();
         }
       },
     );
@@ -410,6 +447,7 @@
       () => api(`/decisions/${id}/candidates`, { method: 'POST', body: JSON.stringify({ content }) }),
       async () => {
         ui.manualForm.reset();
+        flow.recommendationError = '';
         showAlert('새 후보 버전을 등록했어요. 두 계정이 최신 후보를 각각 승인해야 해요.', true);
         await loadDetail();
       },
