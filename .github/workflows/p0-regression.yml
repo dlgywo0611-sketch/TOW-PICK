@@ -29,13 +29,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: TWO-PICK decision UI logic
-        run: node tests/test_decision_flow_logic.cjs
-      - name: PET DOCK regression
-        run: node tests/usb-reconnect.test.cjs
-      - name: JavaScript syntax
-        run: |
-          node --check frontend/app.js
-          node --check frontend/petdock-bridge.js
-          node --check frontend/decision-flow-logic.js
-          node --check frontend/decision-flow.js
+      - name: Complete frontend regression suite
+        run: npm test
+      - name: All frontend JavaScript syntax
+        run: npm run test:syntax
