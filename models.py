@@ -316,3 +316,20 @@ class NotificationJob(Base):
     attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     succeeded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NotificationDispatchAttempt(Base):
+    """Durable claim/result ledger; new table preserves existing job rows."""
+
+    __tablename__ = "notification_dispatch_attempts"
+    __table_args__ = (UniqueConstraint("job_id", "number",
+                                      name="uq_notification_dispatch_attempt"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("notification_jobs.id"), index=True)
+    number: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    claimed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retry_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error_code: Mapped[str | None] = mapped_column(String(40))

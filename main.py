@@ -1,8 +1,10 @@
 import secrets
+import hmac
+import os
 from datetime import timedelta, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select, update
@@ -11,6 +13,7 @@ from sqlalchemy.orm import Session, aliased, selectinload
 
 import models
 import notification_logic
+import notification_dispatch
 import schemas
 from database import Base, engine, ensure_current_candidate_index, get_db
 from recommendation_engine import choose_balanced_option
@@ -1215,6 +1218,64 @@ def update_my_notification_setting(request: schemas.NotificationSettingInput,
     db.commit()
     db.refresh(setting)
     return setting
+
+
+def require_internal_n8n(secret: str | None = Header(default=None,
+                              alias="X-Two-Pick-Internal-Secret")) -> None:
+    configured = os.getenv("TWO_PICK_N8N_INTERNAL_SECRET")
+    if not configured:
+        raise HTTPException(status_code=503, detail="Internal n8n auth is not configured")
+    if not secret or not hmac.compare_digest(secret, configured):
+        raise HTTPException(status_code=403, detail="Internal n8n auth failed")
+
+
+@app.get("/internal/notifications/due", dependencies=[Depends(require_internal_n8n)])
+def read_due_notification_jobs(db: Session = Depends(get_db)):
+    """Return opaque IDs only; never expose recipients in a listing."""
+    begin_sqlite_write(db)
+    job_ids = notification_dispatch.due_job_ids(db)
+    db.commit()
+    return {"job_ids": job_ids}
+
+
+@app.post("/internal/notifications/{job_id}/claim",
+          dependencies=[Depends(require_internal_n8n)])
+def claim_notification_job(job_id: int, db: Session = Depends(get_db)):
+    begin_sqlite_write(db)
+    try:
+        result = notification_dispatch.claim_job(db, job_id)
+    except notification_dispatch.DispatchConflict as error:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    db.commit()
+    return result
+
+
+@app.post("/internal/notifications/{job_id}/verify",
+          dependencies=[Depends(require_internal_n8n)])
+def verify_notification_job(job_id: int, db: Session = Depends(get_db)):
+    job = db.get(models.NotificationJob, job_id)
+    return {"job_id": job_id,
+            "attempt": job.attempt_count if job is not None else None,
+            "notification_type": job.notification_type if job is not None else None,
+            "eligible": notification_dispatch.verify_claim(db, job_id)}
+
+
+@app.post("/internal/notifications/{job_id}/result",
+          dependencies=[Depends(require_internal_n8n)])
+def record_notification_result(job_id: int,
+                               request: schemas.NotificationDispatchResultInput,
+                               db: Session = Depends(get_db)):
+    begin_sqlite_write(db)
+    try:
+        result = notification_dispatch.finish_job(
+            db, job_id, attempt_number=request.attempt,
+            result=request.result, error_code=request.error_code)
+    except notification_dispatch.DispatchConflict as error:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    db.commit()
+    return result
 
 @app.post("/messages", response_model=schemas.MessageRead)
 def create_message(
