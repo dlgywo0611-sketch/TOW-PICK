@@ -1,0 +1,14 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const context = { globalThis: {} };
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'frontend', 'history-api-logic.js'), 'utf8'), context);
+const logic = context.globalThis.TwoPickHistoryApiLogic;
+const history = logic.buildHistory([{ id: 2, title: '신규', status: 'confirmed' }, { id: 1, title: '과거', status: 'confirmed' }, { id: 3, title: '진행', status: 'open' }], [{ decision_id: 2, candidate_id: 20, candidate_version: 2, content_snapshot: '초밥', confirmed_at: '2026-11-25T09:00:00' }], [{ id: 1, current_candidate: { id: 10, version: 1, content: '산책' } }]);
+assert.equal(history.length, 2);
+assert.equal(history[0].result, '초밥');
+assert.equal(history[1].source, 'legacy');
+assert.equal(JSON.stringify(logic.normalizeFeedback({ score: 4, comment: '좋아요' })), JSON.stringify({ score: 4, comment: '좋아요' }));
+assert.equal(logic.normalizeFeedback({ score: 9 }).score, null);
+console.log('PASS: real confirmation history, legacy fallback and private feedback normalization');

@@ -15,6 +15,8 @@
     <script src="/static/feature-data.js" defer></script>
     <script src="/static/mock-features-logic.js" defer></script>
     <script src="/static/mock-features.js" defer></script>
+    <script src="/static/history-api-logic.js" defer></script>
+    <script src="/static/history-api.js" defer></script>
     <script src="/static/dashboard-logic.js" defer></script>
     <script src="/static/dashboard.js" defer></script>
     <script src="/static/service-shell-logic.js" defer></script>
@@ -352,18 +354,10 @@
                 <h3 id="history-title">함께 고른 순간들</h3>
                 <p>완료된 공동결정을 돌아보고 서로의 만족도를 남겨보세요.</p>
               </div>
-              <span class="mock-badge">테스트 데이터</span>
+              <span class="mock-badge api-source-badge">실제 API</span>
             </header>
 
-            <div class="history-toolbar">
-              <label for="history-filter">기록 분류</label>
-              <select id="history-filter">
-                <option value="all">전체</option>
-                <option value="meal">식사</option>
-                <option value="date">데이트</option>
-                <option value="home">집에서</option>
-              </select>
-            </div>
+            <div class="history-toolbar"><p class="history-meta">확정된 결정만 표시하며 상대방의 평가는 공개하지 않아요.</p><button id="history-refresh" class="decision-secondary" type="button">기록 새로고침</button></div>
 
             <div class="history-layout">
               <div id="history-list" class="history-list" aria-label="공동결정 기록 목록"></div>
@@ -379,6 +373,9 @@
                 <fieldset class="satisfaction-fieldset">
                   <legend>이 결정은 얼마나 만족스러웠나요?</legend>
                   <div id="satisfaction-buttons" class="satisfaction-buttons" aria-label="만족도 1점부터 5점"></div>
+                  <label for="satisfaction-comment">선택적 의견</label>
+                  <textarea id="satisfaction-comment" maxlength="500" rows="3" placeholder="나만 볼 수 있는 의견을 최대 500자로 남겨보세요."></textarea>
+                  <button id="satisfaction-save" class="decision-primary" type="button">내 평가 저장</button>
                   <p id="satisfaction-status" class="history-meta" aria-live="polite"></p>
                 </fieldset>
               </article>

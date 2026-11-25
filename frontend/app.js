@@ -66,6 +66,8 @@ const errorMessages = {
   'No mutually suitable option; try a manual candidate': '두 사람이 함께 수용할 추천 후보가 없어요. 추천 기회는 소진됐고 수동 후보를 등록할 수 있어요.',
   'Recommendation only available before first candidate': '추천은 첫 후보를 만들기 전에 한 번만 사용할 수 있어요.',
   'Decision is already closed': '이미 확정된 결정이에요.',
+  'Decision is not confirmed': '확정된 결정에서만 만족도를 남길 수 있어요.',
+  'Feedback not found': '아직 작성한 만족도 평가가 없습니다.',
   'User already approved this candidate': '이미 승인한 후보예요.',
   'Only the current candidate can be approved': '최신 후보만 승인할 수 있어요.',
 };
@@ -143,7 +145,10 @@ async function api(path, options = {}) {
         render();
         throw new Error('로그인이 만료되었습니다. 다시 로그인해 주세요.');
       }
-      throw new Error(message);
+      const requestError = new Error(message);
+      requestError.status = response.status;
+      requestError.detail = payload.detail;
+      throw requestError;
     }
     return response.status === 204 ? null : response.json();
   } catch (error) {

@@ -6,6 +6,8 @@ const context = { globalThis: {} };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'frontend', 'feature-data.js'), 'utf8'), context);
 const data = context.globalThis.TwoPickFeatureData;
 assert.equal(data.getFeatureSource('decisions'), 'api');
+assert.equal(data.getFeatureSource('history'), 'api');
+assert.equal(data.getFeatureSource('satisfaction'), 'api');
 assert.equal(data.getFeatureSource('schedules'), 'mock');
 assert.equal(data.getFeatureSource('profileSettings'), 'local');
 assert.equal(data.getFeatureSource('missing'), 'unknown');
