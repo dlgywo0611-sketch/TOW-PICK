@@ -29,11 +29,18 @@ const elements = {
   connectBle: document.querySelector('#connect-ble'),
   petdockStatus: document.querySelector('#petdock-status'),
   petEvent: document.querySelector('#pet-event'),
+  petEventMeta: document.querySelector('#pet-event-meta'),
+  bleNotifyStatus: document.querySelector('#ble-notify-status'),
   ledControls: document.querySelector('#led-controls'),
 };
 
 const petDock = new PetDockBridge();
-const deviceState = { usb: false, ble: false };
+const deviceState = {
+  usb: false,
+  ble: false,
+  bleNotifySupported: null,
+  bleNotifyActive: false,
+};
 
 const errorMessages = {
   'Incorrect email or password': '이메일 또는 비밀번호가 올바르지 않습니다.',
@@ -75,6 +82,15 @@ function renderDeviceState() {
   elements.connectUsb.disabled = deviceState.usb;
   elements.connectBle.textContent = deviceState.ble ? '블루투스 연결됨' : '블루투스 연결';
   elements.connectBle.disabled = deviceState.ble;
+  if (!deviceState.ble) {
+    elements.bleNotifyStatus.textContent = 'FFE1 LED 제어 · 버튼 Notify 연결 대기';
+  } else if (deviceState.bleNotifyActive) {
+    elements.bleNotifyStatus.textContent = 'FFE1 LED 제어 · 버튼 Notify 수신 중';
+  } else if (deviceState.bleNotifySupported === false) {
+    elements.bleNotifyStatus.textContent = 'FFE1 Notify 미지원 · LED 제어만 사용';
+  } else {
+    elements.bleNotifyStatus.textContent = 'FFE1 Notify 시작 실패 · LED 제어만 사용';
+  }
   elements.ledControls.querySelectorAll('button').forEach((button) => {
     button.disabled = !deviceState.ble;
   });
@@ -303,8 +319,14 @@ elements.connectBle.addEventListener('click', async () => {
   hideAlert();
   setButtonBusy(elements.connectBle, true, '검색 중…');
   try {
-    await petDock.connectBluetooth();
-    showAlert('Meem 블루투스가 연결되었습니다.', true);
+    const result = await petDock.connectBluetooth();
+    if (result.notifyActive) {
+      showAlert('Meem 블루투스와 버튼 Notify가 연결되었습니다.', true);
+    } else if (!result.notifySupported) {
+      showAlert('Meem이 연결되었습니다. FFE1 Notify 미지원으로 LED 제어만 사용합니다.', true);
+    } else {
+      showAlert(`Meem이 연결되었습니다. Notify 시작 실패로 LED 제어만 사용합니다. (${result.notifyError})`);
+    }
   } catch (error) {
     showAlert(error.message);
   } finally {
@@ -330,6 +352,8 @@ petDock.addEventListener('usbstate', (event) => {
 
 petDock.addEventListener('blestate', (event) => {
   deviceState.ble = event.detail.connected;
+  deviceState.bleNotifySupported = event.detail.notifySupported;
+  deviceState.bleNotifyActive = event.detail.notifyActive;
   renderDeviceState();
 });
 
@@ -337,6 +361,8 @@ petDock.addEventListener('button', (event) => {
   elements.petEvent.textContent = event.detail.button === 'A'
     ? '펫 반응 요청 (버튼 A)'
     : '펫 상태 확인 (버튼 B)';
+  elements.petEventMeta.textContent = `입력 출처 ${event.detail.source} · 누적 ${event.detail.count}회 `
+    + `(A ${event.detail.counts.A} / B ${event.detail.counts.B})`;
 });
 
 petDock.addEventListener('led', (event) => {

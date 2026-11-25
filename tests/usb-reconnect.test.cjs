@@ -46,7 +46,7 @@ const navigator = { serial: { requestPort: async () => {
 const context = {
   window: { isSecureContext: true },
   navigator, EventTarget, Event, CustomEvent: CustomEventPolyfill,
-  TextDecoderStream, TextEncoderStream, TextEncoder,
+  TextDecoderStream, TextEncoderStream, TextDecoder, TextEncoder,
   ReadableStream, WritableStream, TransformStream,
 };
 const bridgePath = path.join(__dirname, '..', 'frontend', 'petdock-bridge.js');
@@ -63,9 +63,13 @@ async function until(predicate, label) {
 
 (async () => {
   const bridge = new Bridge();
-  const states = [], buttons = [];
+  const states = [], buttons = [], sources = [], counts = [];
   bridge.addEventListener('usbstate', ev => states.push(ev.detail.connected));
-  bridge.addEventListener('button', ev => buttons.push(ev.detail.button));
+  bridge.addEventListener('button', ev => {
+    buttons.push(ev.detail.button);
+    sources.push(ev.detail.source);
+    counts.push(ev.detail.count);
+  });
 
   // 1. Initial connection and button parsing
   const first = new FakeSerialPort({ failClose: true });
@@ -107,6 +111,8 @@ async function until(predicate, label) {
   await bridge.disconnectUsb();
   assert.deepEqual(states, [true, false, true, false, true, false]);
   assert.deepEqual(buttons, ['A', 'B', 'A', 'B']);
+  assert.deepEqual(sources, ['USB', 'USB', 'USB', 'USB']);
+  assert.deepEqual(counts, [1, 2, 3, 4]);
 
   // 6. Use actual characteristic properties to select the BLE write method.
   const withoutResponseWrites = [];

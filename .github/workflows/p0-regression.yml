@@ -32,7 +32,9 @@ jobs:
       - name: TWO-PICK decision UI logic
         run: node tests/test_decision_flow_logic.cjs
       - name: PET DOCK regression
-        run: node tests/usb-reconnect.test.cjs
+        run: |
+          node tests/usb-reconnect.test.cjs
+          node tests/ble-notify.test.cjs
       - name: JavaScript syntax
         run: |
           node --check frontend/app.js
