@@ -1,0 +1,17 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const context = { globalThis: {} };
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'frontend', 'feature-data.js'), 'utf8'), context);
+const data = context.globalThis.TwoPickFeatureData;
+assert.equal(data.getFeatureSource('decisions'), 'api');
+assert.equal(data.getFeatureSource('schedules'), 'mock');
+assert.equal(data.getFeatureSource('profileSettings'), 'local');
+assert.equal(data.getFeatureSource('missing'), 'unknown');
+const schedules = data.getMockData('schedules');
+schedules[0].title = 'changed';
+assert.notEqual(data.getMockData('schedules')[0].title, 'changed');
+assert.equal(data.getMockData('notifications').length, 4);
+assert.equal(data.getMockData('pet').maximum, 100);
+console.log('PASS: API, mock and local data sources are explicit and mock data is isolated');

@@ -1,8 +1,9 @@
 (() => {
   'use strict';
   const logic = globalThis.TwoPickDashboardLogic;
+  const data = globalThis.TwoPickFeatureData;
   const root = document.querySelector('#main-dashboard');
-  if (!logic || !root) return;
+  if (!logic || !data || !root) return;
 
   const ui = {
     greeting: root.querySelector('#dashboard-greeting'),
@@ -12,11 +13,7 @@
     schedules: root.querySelector('#dashboard-schedule-list'),
     pet: root.querySelector('#dashboard-pet-connection'),
   };
-  const mockScheduleSeed = [
-    { id: 'seed-1', title: '우리의 첫 만남 기념일', date: '2026-11-26', type: 'anniversary' },
-    { id: 'seed-2', title: '겨울 전시회 데이트', date: '2026-11-29', type: 'date' },
-    { id: 'seed-3', title: '함께 장보기', date: '2026-12-05', type: 'todo' },
-  ];
+  const mockScheduleSeed = data.getMockData('schedules');
   let busy = false;
 
   function escapeHtml(value) {
