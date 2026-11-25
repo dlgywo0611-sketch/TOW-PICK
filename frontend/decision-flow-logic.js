@@ -47,8 +47,8 @@
     });
   }
 
-  function canEditConditions(detail) {
-    return Boolean(detail && detail.status === 'open' && !detail.current_candidate);
+  function canEditConditions(detail, attemptedLocally = false) {
+    return Boolean(detail && detail.status === 'open' && !detail.current_candidate && !attemptedLocally);
   }
 
   function conditionsReady(status) {
@@ -57,7 +57,7 @@
   }
 
   function canRecommend(detail, status, attemptedLocally = false) {
-    return canEditConditions(detail) && conditionsReady(status) && !attemptedLocally;
+    return canEditConditions(detail, attemptedLocally) && conditionsReady(status);
   }
 
   function canApprove(detail, userId) {

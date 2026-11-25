@@ -161,7 +161,8 @@
     ui.selectedStatus.textContent = detail?.confirmed ? '최종 확정' : '진행 중';
     ui.selectedStatus.classList.toggle('confirmed', Boolean(detail?.confirmed));
 
-    const editable = logic.canEditConditions(detail);
+    const recommendationAttempted = flow.attempted.has(flow.selectedId);
+    const editable = logic.canEditConditions(detail, recommendationAttempted);
     for (const control of ui.conditionForm.querySelectorAll('input, textarea, button')) {
       control.disabled = flow.busy || !editable;
     }
@@ -173,7 +174,7 @@
       ui.conditionForm.reset();
     }
     ui.conditionButton.textContent = editable ? (flow.ownConditions ? '내 조건 수정·저장하기' : '내 조건 저장하기') :
-      '후보 생성 후 조건 수정 불가';
+      recommendationAttempted && !detail?.current_candidate ? '추천 시도 후 조건 수정 불가' : '후보 생성 후 조건 수정 불가';
     renderMemberStatuses();
     renderApprovals();
     renderRecommendationNotice();
