@@ -2,8 +2,9 @@
   'use strict';
   const logic = globalThis.TwoPickDashboardLogic;
   const data = globalThis.TwoPickFeatureData;
+  const scheduleLogic = globalThis.TwoPickScheduleApiLogic;
   const root = document.querySelector('#main-dashboard');
-  if (!logic || !data || !root) return;
+  if (!logic || !data || !scheduleLogic || !root) return;
 
   const ui = {
     greeting: root.querySelector('#dashboard-greeting'),
@@ -12,31 +13,30 @@
     confirmed: root.querySelector('#dashboard-confirmed-list'),
     schedules: root.querySelector('#dashboard-schedule-list'),
     pet: root.querySelector('#dashboard-pet-connection'),
+    couple: root.querySelector('#dashboard-couple-summary'), notifications: root.querySelector('#dashboard-notification-summary'),
   };
-  const mockScheduleSeed = data.getMockData('schedules');
   let busy = false;
 
   function escapeHtml(value) {
     return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
   }
 
-  function readSchedules() {
-    try {
-      const stored = JSON.parse(localStorage.getItem('tow_pick_mock_schedules') || 'null');
-      return Array.isArray(stored) ? stored : mockScheduleSeed;
-    } catch (_) {
-      return mockScheduleSeed;
-    }
-  }
-
   function renderEmpty(target, message) {
     target.innerHTML = `<p class="dashboard-empty">${escapeHtml(message)}</p>`;
   }
 
-  function renderSchedules() {
-    const items = logic.upcomingSchedules(readSchedules(), new Date());
-    if (!items.length) return renderEmpty(ui.schedules, '다가오는 테스트 일정이 없어요.');
-    ui.schedules.innerHTML = items.map((item) => `<div class="dashboard-item"><time datetime="${item.date}">${item.date.slice(5).replace('-', '.')}</time><div><strong>${escapeHtml(item.title)}</strong><small>${item.type === 'anniversary' ? '기념일' : item.type === 'date' ? '데이트' : '함께 할 일'}</small></div></div>`).join('');
+  function renderSchedules(schedules = []) {
+    const items = scheduleLogic.upcomingOccurrences(schedules, new Date(), 3);
+    if (!items.length) return renderEmpty(ui.schedules, '다가오는 일정이 없어요.');
+    ui.schedules.innerHTML = items.map((item) => `<div class="dashboard-item"><time datetime="${item.date}">${item.date.slice(5).replace('-', '.')}</time><div><strong>${escapeHtml(item.title)}</strong><small>${item.kind === 'anniversary' ? '기념일' : '일반 일정'} · ${item.local_time ? item.local_time.slice(0, 5) : '종일'}</small></div></div>`).join('');
+  }
+
+  function renderCouple() {
+    const members = state.couple?.members || [];
+    ui.couple.innerHTML = `<div class="dashboard-item"><span class="dashboard-check">${members.length >= 2 ? '✓' : '…'}</span><div><strong>${members.length >= 2 ? '두 사람 연결됨' : '상대방 연결 대기'}</strong><small>${members.map((item) => escapeHtml(item.nickname)).join(' · ') || '커플 연결 정보 없음'}</small></div></div>`;
+  }
+  function renderNotificationSetting(setting) {
+    ui.notifications.innerHTML = `<div class="dashboard-item"><span class="dashboard-check">${setting.consent ? '✓' : '–'}</span><div><strong>${setting.consent ? '알림 수신 동의' : '알림 미동의'}</strong><small>${setting.consent ? `${setting.d1_enabled ? 'D-1 ' : ''}${setting.day_of_enabled ? '당일 ' : ''}· ${String(setting.send_time).slice(0, 5)} · 실제 발송 준비 중` : '설정에서 본인 동의를 변경할 수 있어요.'}</small></div></div>`;
   }
 
   function renderDecisions(decisions, confirmations) {
@@ -56,13 +56,14 @@
     ui.refresh.disabled = true;
     ui.refresh.textContent = '불러오는 중…';
     ui.greeting.textContent = `${state.user.nickname}님의 오늘`;
-    renderSchedules();
+    renderCouple();
     try {
-      const [decisions, confirmations] = await Promise.all([
+      const [decisions, confirmations, schedules, notificationSetting] = await Promise.all([
         api('/decisions'),
-        api('/decision-confirmations').catch(() => []),
+        api('/decision-confirmations'), api('/schedules'), api('/notifications/settings/me'),
       ]);
       renderDecisions(decisions, confirmations);
+      renderSchedules(schedules); renderNotificationSetting(notificationSetting);
     } catch (error) {
       renderEmpty(ui.active, error.message);
       renderEmpty(ui.confirmed, '결정 기록을 불러오지 못했어요.');
@@ -76,7 +77,8 @@
   ui.refresh.addEventListener('click', refresh);
   window.addEventListener('twopick:session-changed', refresh);
   window.addEventListener('twopick:decisions-changed', refresh);
-  window.addEventListener('twopick:schedules-changed', renderSchedules);
+  window.addEventListener('twopick:schedules-changed', (event) => renderSchedules(event.detail.schedules));
+  window.addEventListener('twopick:notification-settings-changed', (event) => renderNotificationSetting(event.detail));
   window.addEventListener('twopick:pet-state', (event) => {
     const labels = [event.detail.usb && 'USB', event.detail.ble && 'BLE'].filter(Boolean);
     ui.pet.textContent = labels.length ? `PET DOCK ${labels.join(' + ')} 연결됨` : 'PET DOCK 연결 대기';

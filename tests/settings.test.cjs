@@ -8,5 +8,6 @@ const logic = context.globalThis.TwoPickSettingsLogic;
 assert.equal(JSON.stringify(logic.validateNickname('  우리   둘  ')), JSON.stringify({ valid: true, message: '', value: '우리 둘' }));
 assert.equal(logic.validateNickname('   ').valid, false);
 assert.equal(logic.normalizeNickname('가'.repeat(60)).length, 50);
-assert.equal(JSON.stringify(logic.normalizePreferences({ decision: false, pet: 'yes' })), JSON.stringify({ decision: false, schedule: true, pet: true }));
-console.log('PASS: local account settings validation and preference defaults');
+assert.equal(JSON.stringify(logic.normalizeNotificationSettings({ consent: true, d1_enabled: true, send_time: '18:30:00' })), JSON.stringify({ consent: true, d1_enabled: true, day_of_enabled: false, send_time: '18:30' }));
+assert.equal(logic.normalizeNotificationSettings({ send_time: 'bad' }).send_time, '09:00');
+console.log('PASS: local profile validation and notification API setting normalization');

@@ -201,9 +201,19 @@
               <article class="dashboard-card">
                 <div class="dashboard-card-heading">
                   <div><span class="dashboard-icon amber">□</span><h4>다가오는 일정</h4></div>
-                  <span class="mock-badge">테스트 데이터</span>
+                  <span class="live-badge">실제 API</span>
                 </div>
                 <div id="dashboard-schedule-list" class="dashboard-items"></div>
+              </article>
+
+              <article class="dashboard-card">
+                <div class="dashboard-card-heading"><div><span class="dashboard-icon sage">♥</span><h4>커플 연결 상태</h4></div><a href="#settings">프로필 보기 →</a></div>
+                <div id="dashboard-couple-summary" class="dashboard-items"><p class="dashboard-empty">불러오는 중이에요.</p></div>
+              </article>
+
+              <article class="dashboard-card">
+                <div class="dashboard-card-heading"><div><span class="dashboard-icon amber">◉</span><h4>내 알림 설정</h4></div><span class="live-badge">실제 API</span></div>
+                <div id="dashboard-notification-summary" class="dashboard-items"><p class="dashboard-empty">불러오는 중이에요.</p></div>
               </article>
 
               <article class="dashboard-card dashboard-pet-card">
@@ -537,12 +547,15 @@
                 </form>
               </article>
               <article class="settings-card">
-                <header><div><p class="eyebrow coral">PREFERENCES</p><h4>알림 설정</h4></div><span class="mock-badge">이 기기 저장</span></header>
-                <div class="preference-list">
-                  <label><span><strong>공동결정 알림</strong><small>조건 제출, 승인 요청, 최종 확정</small></span><input id="setting-decision-notifications" type="checkbox" /></label>
-                  <label><span><strong>일정 알림</strong><small>기념일과 커플 일정</small></span><input id="setting-schedule-notifications" type="checkbox" /></label>
-                  <label><span><strong>OUR PET 알림</strong><small>성장 상태와 PET DOCK 연결</small></span><input id="setting-pet-notifications" type="checkbox" /></label>
-                </div>
+                <header><div><p class="eyebrow coral">NOTIFICATIONS</p><h4>일정 알림 설정</h4></div><span class="mock-badge api-source-badge">실제 API</span></header>
+                <form id="notification-settings-form" class="preference-list">
+                  <label><span><strong>알림 수신 동의</strong><small>기본은 미동의이며 본인 설정만 변경됩니다.</small></span><input id="setting-notification-consent" name="consent" type="checkbox" /></label>
+                  <label><span><strong>D-1 알림</strong><small>일정 하루 전 알림 작업 예약</small></span><input id="setting-d1-enabled" name="d1_enabled" type="checkbox" /></label>
+                  <label><span><strong>당일 알림</strong><small>일정 당일 알림 작업 예약</small></span><input id="setting-day-of-enabled" name="day_of_enabled" type="checkbox" /></label>
+                  <label class="notification-time-label"><span><strong>알림 시각</strong><small>Asia/Seoul 기준</small></span><input id="setting-send-time" name="send_time" type="time" value="09:00" required /></label>
+                  <button id="notification-settings-save" class="decision-primary" type="submit">알림 설정 저장</button>
+                  <p id="notification-settings-status" class="settings-help" aria-live="polite">실제 이메일 발송은 아직 제공되지 않아요. 현재는 동의와 예약 설정만 저장합니다.</p>
+                </form>
               </article>
               <article class="settings-card account-management-card">
                 <header><div><p class="eyebrow coral">ACCOUNT</p><h4>계정 관리</h4></div></header>

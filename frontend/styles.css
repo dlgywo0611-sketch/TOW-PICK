@@ -472,6 +472,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .preference-list strong, .preference-list small { display: block; }
 .preference-list strong { font-size: 10px; } .preference-list small { margin-top: 3px; color: var(--muted); font-size: 8px; }
 .preference-list input { width: 18px; height: 18px; accent-color: var(--coral); }
+.preference-list .notification-time-label input { width: 112px; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: white; }
+.preference-list > .decision-primary { width: 100%; }
 .account-management-card { grid-column: 1 / -1; }
 .account-management-card > p { color: var(--muted); font-size: 9px; }
 .settings-account-actions { display: flex; gap: 8px; margin: 13px 0 9px; }
