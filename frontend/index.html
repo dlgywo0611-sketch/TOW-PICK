@@ -19,6 +19,8 @@
     <script src="/static/service-shell.js" defer></script>
     <script src="/static/onboarding-logic.js" defer></script>
     <script src="/static/onboarding.js" defer></script>
+    <script src="/static/notification-logic.js" defer></script>
+    <script src="/static/notifications.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">본문으로 바로가기</a>
@@ -29,6 +31,9 @@
       </a>
       <div class="top-actions">
         <span class="api-badge"><i></i> API CONNECTED</span>
+        <button id="notification-button" class="notification-button hidden" type="button" aria-label="알림 센터 열기" aria-haspopup="dialog">
+          <span aria-hidden="true">♢</span><b id="notification-badge" class="hidden">0</b>
+        </button>
         <button id="logout-button" class="profile-button hidden" type="button" aria-label="로그아웃">
           <span id="profile-name">사용자</span>
           <span class="logout-label">로그아웃</span>
@@ -503,6 +508,21 @@
           <button id="onboarding-action" class="decision-primary" type="button">커플 연결 시작하기</button>
         </div>
       </section>
+    </div>
+
+    <div id="notification-center" class="notification-center hidden" role="dialog" aria-modal="true" aria-labelledby="notification-title">
+      <button id="notification-backdrop" class="notification-backdrop" type="button" aria-label="알림 센터 닫기"></button>
+      <aside class="notification-drawer">
+        <header>
+          <div><p class="eyebrow coral">NOTIFICATIONS</p><h2 id="notification-title">알림 센터</h2></div>
+          <button id="notification-close" type="button" aria-label="알림 센터 닫기">×</button>
+        </header>
+        <div class="notification-toolbar">
+          <span class="mock-badge">테스트 데이터</span>
+          <button id="notification-read-all" type="button">모두 읽음</button>
+        </div>
+        <div id="notification-list" class="notification-list" aria-live="polite"></div>
+      </aside>
     </div>
   </body>
 </html>
