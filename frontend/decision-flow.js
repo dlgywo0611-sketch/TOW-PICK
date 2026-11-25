@@ -161,7 +161,7 @@
     ui.selectedStatus.textContent = detail?.confirmed ? '최종 확정' : '진행 중';
     ui.selectedStatus.classList.toggle('confirmed', Boolean(detail?.confirmed));
 
-    const recommendationAttempted = flow.attempted.has(flow.selectedId);
+    const recommendationAttempted = Boolean(detail.recommendation_attempted) || flow.attempted.has(flow.selectedId);
     const editable = logic.canEditConditions(detail, recommendationAttempted);
     for (const control of ui.conditionForm.querySelectorAll('input, textarea, button')) {
       control.disabled = flow.busy || !editable;

@@ -1,9 +1,9 @@
-// PET DOCK bridge for TWO PICK (PR #4 USB reconnection fix)
+// PET DOCK bridge for TWO PICK
 class PetDockBridge extends EventTarget {
   static BLE_SERVICE = '0000ffe0-0000-1000-8000-00805f9b34fb';
   static BLE_CHARACTERISTIC = '0000ffe1-0000-1000-8000-00805f9b34fb';
 
-  constructor() {
+  constructor({ dedupeWindowMs = 150, now = () => Date.now() } = {}) {
     super();
     this.serialPort = null;
     this.serialReader = null;
@@ -12,9 +12,15 @@ class PetDockBridge extends EventTarget {
     this.bluetoothDevice = null;
     this.bluetoothCharacteristic = null;
     this._bleConnecting = false;
-    this._handleBluetoothDisconnect = () => this._clearBluetoothState(
-      '블루투스 연결이 끊겼습니다. 장치 전원과 거리를 확인한 뒤 다시 연결해 주세요.',
-    );
+    this.bleNotifyActive = false;
+    this._bleDecoder = new TextDecoder();
+    this._blePending = '';
+    this._onGattDisconnected = this._handleGattDisconnected.bind(this);
+    this._onBleValueChanged = this._handleBleValueChanged.bind(this);
+    this._dedupeWindowMs = dedupeWindowMs;
+    this._now = now;
+    this._lastButton = null;
+    this.buttonCounts = { total: 0, A: 0, B: 0 };
   }
 
   get supportsUsb() {
@@ -93,9 +99,32 @@ class PetDockBridge extends EventTarget {
 
   handleSerialLine(line) {
     if (line !== 'BTN_A' && line !== 'BTN_B') return;
+    this._emitButton(line, 'USB');
+  }
+
+  _emitButton(raw, source) {
+    if (raw !== 'BTN_A' && raw !== 'BTN_B') return false;
+    const button = raw === 'BTN_A' ? 'A' : 'B';
+    const timestamp = this._now();
+    const duplicate = this._lastButton
+      && this._lastButton.button === button
+      && this._lastButton.source !== source
+      && timestamp - this._lastButton.timestamp <= this._dedupeWindowMs;
+    if (duplicate) return false;
+
+    this._lastButton = { button, source, timestamp };
+    this.buttonCounts.total += 1;
+    this.buttonCounts[button] += 1;
     this.dispatchEvent(new CustomEvent('button', {
-      detail: { button: line === 'BTN_A' ? 'A' : 'B', raw: line },
+      detail: {
+        button,
+        raw,
+        source,
+        count: this.buttonCounts.total,
+        counts: { A: this.buttonCounts.A, B: this.buttonCounts.B },
+      },
     }));
+    return true;
   }
 
   _clearUsbState(port) {
@@ -150,7 +179,7 @@ class PetDockBridge extends EventTarget {
         filters: [{ name: 'Meem' }],
         optionalServices: [PetDockBridge.BLE_SERVICE],
       });
-      device.addEventListener('gattserverdisconnected', this._handleBluetoothDisconnect);
+      device.addEventListener('gattserverdisconnected', this._onGattDisconnected);
       this.bluetoothDevice = device;
 
       const server = await device.gatt.connect();
@@ -160,37 +189,101 @@ class PetDockBridge extends EventTarget {
         throw new Error('Meem FFE1 특성이 BLE 쓰기를 지원하지 않습니다.');
       }
       this.bluetoothCharacteristic = characteristic;
-      this.dispatchEvent(new CustomEvent('blestate', { detail: { connected: true } }));
+      const notifySupported = this.supportsBleNotify(characteristic);
+      let notifyError = null;
+      if (notifySupported) {
+        characteristic.addEventListener('characteristicvaluechanged', this._onBleValueChanged);
+        try {
+          await characteristic.startNotifications();
+          this.bleNotifyActive = true;
+        } catch (error) {
+          characteristic.removeEventListener('characteristicvaluechanged', this._onBleValueChanged);
+          notifyError = error.message || 'Notify 시작 실패';
+        }
+      }
+
+      const detail = {
+        connected: true,
+        notifySupported,
+        notifyActive: this.bleNotifyActive,
+        notifyError,
+      };
+      this.dispatchEvent(new CustomEvent('blestate', { detail }));
+      return detail;
     } catch (error) {
       if (device?.gatt?.connected) device.gatt.disconnect();
-      if (device) device.removeEventListener('gattserverdisconnected', this._handleBluetoothDisconnect);
-      this.bluetoothDevice = null;
-      this.bluetoothCharacteristic = null;
+      this._clearBluetoothState(false);
       throw error;
     } finally {
       this._bleConnecting = false;
     }
   }
 
-  _clearBluetoothState(reason = '') {
+  supportsBleNotify(characteristic = this.bluetoothCharacteristic) {
+    const properties = characteristic?.properties;
+    return Boolean(
+      (properties?.notify || properties?.indicate)
+      && typeof characteristic.startNotifications === 'function'
+      && typeof characteristic.addEventListener === 'function',
+    );
+  }
+
+  _handleBleValueChanged(event) {
+    if (event.target !== this.bluetoothCharacteristic || !event.target?.value) return;
+    const value = event.target.value;
+    const bytes = value.buffer
+      ? new Uint8Array(value.buffer, value.byteOffset || 0, value.byteLength)
+      : new Uint8Array(value);
+    this._blePending += this._bleDecoder.decode(bytes, { stream: true });
+
+    const matches = [...this._blePending.matchAll(/BTN_[AB]/g)];
+    matches.forEach((match) => this._emitButton(match[0], 'BLE'));
+    if (matches.length) {
+      const last = matches[matches.length - 1];
+      this._blePending = this._blePending.slice(last.index + last[0].length);
+    }
+    this._blePending = this._blePending.replace(/^[\r\n\s]+/, '');
+    if (this._blePending.length > 16) this._blePending = this._blePending.slice(-4);
+  }
+
+  _handleGattDisconnected(event) {
+    if (event.target !== this.bluetoothDevice) return;
+    this._clearBluetoothState(false);
+    this.dispatchEvent(new CustomEvent('blestate', {
+      detail: {
+        connected: false,
+        notifySupported: null,
+        notifyActive: false,
+        notifyError: null,
+        reason: '블루투스 연결이 끊겼습니다. 장치 전원과 거리를 확인한 뒤 다시 연결해 주세요.',
+      },
+    }));
+  }
+
+  _clearBluetoothState(disconnect = true) {
     const device = this.bluetoothDevice;
-    if (!device && !this.bluetoothCharacteristic) return;
-    if (device) device.removeEventListener('gattserverdisconnected', this._handleBluetoothDisconnect);
-    this.bluetoothDevice = null;
+    const characteristic = this.bluetoothCharacteristic;
+    if (characteristic?.removeEventListener) {
+      characteristic.removeEventListener('characteristicvaluechanged', this._onBleValueChanged);
+    }
+    if (device?.removeEventListener) {
+      device.removeEventListener('gattserverdisconnected', this._onGattDisconnected);
+    }
     this.bluetoothCharacteristic = null;
+    this.bluetoothDevice = null;
     this._bleConnecting = false;
-    this.dispatchEvent(new CustomEvent('blestate', { detail: { connected: false, reason } }));
+    this.bleNotifyActive = false;
+    this._blePending = '';
+    this._bleDecoder = new TextDecoder();
+    if (disconnect && device?.gatt?.connected) device.gatt.disconnect();
   }
 
   async disconnectBluetooth() {
-    const device = this.bluetoothDevice;
-    if (!device) return;
-    device.removeEventListener('gattserverdisconnected', this._handleBluetoothDisconnect);
-    try {
-      if (device.gatt?.connected) device.gatt.disconnect();
-    } finally {
-      this._clearBluetoothState();
-    }
+    if (!this.bluetoothDevice && !this.bluetoothCharacteristic) return;
+    this._clearBluetoothState(true);
+    this.dispatchEvent(new CustomEvent('blestate', {
+      detail: { connected: false, notifySupported: null, notifyActive: false, notifyError: null },
+    }));
   }
 
   getBleWriteMode(characteristic = this.bluetoothCharacteristic) {

@@ -23,7 +23,7 @@
   function render() {
     const authenticated = Boolean(state.user);
     openButton.classList.toggle('hidden', !authenticated);
-    if (!authenticated) return root.classList.add('hidden');
+    if (!authenticated) { readIds = []; ui.list.innerHTML = ''; ui.badge.textContent = '0'; ui.badge.classList.add('hidden'); return root.classList.add('hidden'); }
     readIds = loadReads();
     const count = logic.unreadCount(items, readIds);
     ui.badge.textContent = count > 9 ? '9+' : String(count);
@@ -31,7 +31,7 @@
     openButton.setAttribute('aria-label', `알림 센터 열기${count ? `, 읽지 않은 알림 ${count}개` : ''}`);
     ui.list.innerHTML = logic.sortNotifications(items).map((item) => {
       const unread = !readIds.includes(String(item.id));
-      return `<button type="button" class="notification-item ${unread ? 'unread' : ''}" data-notification-id="${item.id}" data-route="${item.route}"><span class="notification-type ${item.type}" aria-hidden="true"></span><span><strong>${item.title}</strong><small>${item.message}</small><time>${new Date(item.created_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></span>${unread ? '<i aria-label="읽지 않음"></i>' : ''}</button>`;
+      return `<button type="button" class="notification-item ${unread ? 'unread' : ''}" data-notification-id="${item.id}" data-route="${item.route}"><span class="notification-type ${item.type}" aria-hidden="true"></span><span><strong>${item.title}</strong><small>${item.message}</small><time>${new Date(item.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></span>${unread ? '<i aria-label="읽지 않음"></i>' : ''}</button>`;
     }).join('');
   }
 

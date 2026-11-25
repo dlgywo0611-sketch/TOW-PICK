@@ -48,7 +48,7 @@
   }
 
   function canEditConditions(detail, attemptedLocally = false) {
-    return Boolean(detail && detail.status === 'open' && !detail.current_candidate && !attemptedLocally);
+    return Boolean(detail && detail.status === 'open' && !detail.current_candidate && !detail.recommendation_attempted && !attemptedLocally);
   }
 
   function conditionsReady(status) {
@@ -80,7 +80,7 @@
 
   function getRecommendationFallbackState(detail, statuses, attemptedLocally = false, errorMessage = '') {
     const hasCandidate = Boolean(detail?.current_candidate);
-    const attempted = attemptedLocally || Boolean(errorMessage);
+    const attempted = Boolean(detail?.recommendation_attempted) || attemptedLocally || Boolean(errorMessage);
     const canUseManual = Boolean(detail?.status === 'open' && conditionsReady(statuses));
     if (hasCandidate || !attempted) {
       return { visible: false, canUseManual, tone: 'info', title: '', message: '' };

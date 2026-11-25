@@ -9,7 +9,7 @@
     buttons: root.querySelector('#satisfaction-buttons'), comment: root.querySelector('#satisfaction-comment'), save: root.querySelector('#satisfaction-save'),
     status: root.querySelector('#satisfaction-status'), refresh: root.querySelector('#history-refresh'),
   };
-  let items = []; let selectedId = null; let selectedScore = null; let busy = false;
+  let items = []; let selectedId = null; let selectedScore = null; let busy = false; let ownerId = null;
   const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
   const selectedItem = () => items.find((item) => item.decisionId === selectedId) || items[0] || null;
   const dateLabel = (value) => value ? `${new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} 확정` : '이전 확정 기록 · 확정 시각 정보 없음';
@@ -28,7 +28,7 @@
     if (!item) return;
     renderFeedback();
     try { renderFeedback(await api(`/decisions/${item.decisionId}/feedback/me`)); }
-    catch (error) { if (error.status !== 404) ui.status.textContent = error.message; }
+    catch (error) { if (!isStaleSessionError(error) && error.status !== 404) ui.status.textContent = error.message; }
   }
 
   function render() {
@@ -42,7 +42,8 @@
   }
 
   async function refresh() {
-    if (!state.user || !state.couple || busy) return;
+    if (!state.user || !state.couple) { items = []; selectedId = null; selectedScore = null; render(); renderFeedback(); return; }
+    if (busy) return;
     busy = true; ui.refresh.disabled = true; ui.refresh.textContent = '불러오는 중…';
     try {
       const [decisions, confirmations] = await Promise.all([api('/decisions'), api('/decision-confirmations')]);
@@ -52,7 +53,7 @@
       items = logic.buildHistory(decisions, confirmations, details);
       if (!items.some((item) => item.decisionId === selectedId)) selectedId = items[0]?.decisionId ?? null;
       render();
-    } catch (error) { ui.list.innerHTML = `<p class="decision-empty">${escapeHtml(error.message)}</p>`; ui.detail.classList.add('hidden'); }
+    } catch (error) { if (!isStaleSessionError(error)) { ui.list.innerHTML = `<p class="decision-empty">${escapeHtml(error.message)}</p>`; ui.detail.classList.add('hidden'); } }
     finally { busy = false; ui.refresh.disabled = false; ui.refresh.textContent = '기록 새로고침'; }
   }
 
@@ -67,11 +68,12 @@
     try {
       const feedback = await api(`/decisions/${item.decisionId}/feedback/me`, { method: 'PUT', body: JSON.stringify({ score: selectedScore, comment: ui.comment.value.trim() || null }) });
       renderFeedback(feedback); showAlert('내 만족도 평가를 저장했습니다.', true);
-    } catch (error) { ui.status.textContent = error.message; }
+    } catch (error) { if (!isStaleSessionError(error)) ui.status.textContent = error.message; }
     finally { setButtonBusy(ui.save, false, ''); }
   });
   ui.refresh.addEventListener('click', refresh);
-  window.addEventListener('twopick:session-changed', refresh);
+  function onSessionChange() { const nextOwnerId = state.user?.id ?? null; if (nextOwnerId !== ownerId) { ownerId = nextOwnerId; items = []; selectedId = null; selectedScore = null; busy = false; render(); renderFeedback(); } void refresh(); }
+  window.addEventListener('twopick:session-changed', onSessionChange);
   window.addEventListener('twopick:decisions-changed', refresh);
   void refresh();
 })();
