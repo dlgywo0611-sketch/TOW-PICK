@@ -85,6 +85,7 @@ function renderDeviceState() {
   elements.ledControls.querySelectorAll('button').forEach((button) => {
     button.disabled = !deviceState.ble;
   });
+  window.dispatchEvent(new CustomEvent('twopick:pet-state', { detail: { ...deviceState } }));
 }
 
 function showDeviceError(message) {
