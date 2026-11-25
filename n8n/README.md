@@ -69,3 +69,33 @@ python -m n8n.test_webhook --case wrong-auth --live
 ```
 
 Windows 가상환경에서는 `python` 대신 `.\.venv\Scripts\python.exe`를 사용할 수 있다. 기대 상태는 순서대로 200, 400, 400, 403, 403이다. 기존 6개 시나리오의 두 번째 정상 인증 키 200은 `valid`를 다시 실행하면 된다. 404는 Test URL 대기 종료나 경로 오류 가능성을 확인해야 하는 **FAIL**이며 PASS로 세지 않는다. 연결 실패·시간 초과도 FAIL로 기록하고 자동 재시도하지 않는다. 인증 키나 응답 원문을 Git 증빙에 포함하지 않는다.
+
+## 02 Notification Scheduler 가상 테스트
+
+[`workflows/TWO_PICK_02_NOTIFICATION_SCHEDULER.json`](workflows/TWO_PICK_02_NOTIFICATION_SCHEDULER.json)은 Schedule Trigger(1분 설정) → 가상 알림 데이터 생성 → 발송 조건 검증 → IF 분기 → 가상 발송 처리 또는 차단 기록 → Merge → 결과 집계의 **8개 노드**로 구성된다. 파일은 `active: false`이며 가져온 뒤에도 **활성화하지 않는다**. 예약 실행 설정은 구조 확인용이고, 실제 예약 실행의 지속 동작은 검증되지 않았다. DB, FastAPI, Gmail, 실제 이메일 발송 노드는 없다.
+
+### 가져오기와 수동 실행
+
+1. n8n 편집기의 워크플로 메뉴에서 **Import from File**로 `workflows/TWO_PICK_02_NOTIFICATION_SCHEDULER.json`을 가져온다. 기존 01 Webhook 워크플로와 별개로 보관한다.
+2. 워크플로 이름과 8개 노드의 연결, `Asia/Seoul` 시간대, `active: false`를 확인한다. 자격 증명과 테스트 실행 데이터는 JSON에 포함되지 않는다.
+3. 워크플로를 게시·활성화하지 않은 상태에서 **Execute workflow**로 한 번 수동 실행한다. 마지막 `최종 테스트 결과 집계` 노드의 `overall_result`, `total_tests`, `passed_tests`, `simulated_deliveries`, `blocked_notifications`, `actual_emails_sent`를 확인한다.
+4. 실제 사용자의 데이터나 수신 주소를 입력하지 않는다. 이 워크플로의 수신 주소 `test@example.test`는 테스트 전용이며, `SIMULATED_SUCCESS`는 이메일 발송 성공을 뜻하지 않는다.
+
+### 가상 데이터와 결과
+
+생성 노드는 실행 시각을 기준으로 `send_at`과 한국 날짜 `occurrence_date`를 만들고, 검증 노드는 동의·알림 종류·작업 상태·일정 revision·발송 시각(예정 시각부터 10분 이내)을 검사한다. 테스트에 사용한 `status: sent`는 **가상 입력값**일 뿐 백엔드 알림 작업을 변경하지 않는다.
+
+| 시나리오 | 기대 결과 |
+| --- | --- |
+| D-1 정상 알림 | `SIMULATED_SUCCESS` |
+| 당일 정상 알림 | `SIMULATED_SUCCESS` |
+| 알림 미동의 | `BLOCKED` |
+| 발송 시간 미도달 | `BLOCKED` |
+| 이미 발송된 알림 | `BLOCKED` |
+| 발송 허용 시간 초과 | `BLOCKED` |
+| 일정 수정으로 무효화 | `BLOCKED` |
+| 알림 종류 비활성화 | `BLOCKED` |
+
+2026-11-25 n8n 수동 가상 테스트의 **사용자 제공 결과는 8/8 PASS**다. 가상 발송 2건, 정상 차단 6건, 실제 이메일 0건이다. 저장소에는 당시 실행 로그와 개인 데이터를 넣지 않는다. 새 환경에서 재현할 때는 각 항목의 `test_result`와 집계값을 확인하고, 민감정보를 제거한 증빙을 별도 저장소에 보관한다.
+
+이 시험은 **실제 예약 실행, DB 작업 조회·갱신, 발송 동의의 운영 시점 재검증, Gmail 발송, 영속적인 중복 발송 방지**를 검증하지 않는다. 이 항목들은 후속 구현·실물 검증 전까지 완료로 처리하지 않는다.
