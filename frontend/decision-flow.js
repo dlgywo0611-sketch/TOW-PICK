@@ -90,6 +90,7 @@
       button.addEventListener('click', () => selectDecision(decision.id));
       ui.list.append(button);
     }
+    window.dispatchEvent(new CustomEvent('twopick:decisions-changed', { detail: { decisions: flow.list.slice() } }));
   }
 
   function renderMemberStatuses() {

@@ -104,6 +104,7 @@
 
   function persist() {
     localStorage.setItem(storageKey, JSON.stringify(schedules));
+    window.dispatchEvent(new CustomEvent('twopick:schedules-changed', { detail: { schedules: schedules.slice() } }));
   }
 
   function renderCalendar() {

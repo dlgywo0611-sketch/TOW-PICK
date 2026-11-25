@@ -13,6 +13,8 @@
     <script src="/static/decision-flow.js" defer></script>
     <script src="/static/mock-features-logic.js" defer></script>
     <script src="/static/mock-features.js" defer></script>
+    <script src="/static/dashboard-logic.js" defer></script>
+    <script src="/static/dashboard.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">본문으로 바로가기</a>
@@ -134,6 +136,56 @@
               <button id="refresh-couple-button" class="refresh-button" type="button">연결 상태 새로고침</button>
             </div>
           </article>
+
+          <section id="main-dashboard" class="dashboard-panel hidden" aria-labelledby="dashboard-title">
+            <header class="dashboard-heading">
+              <div>
+                <p class="eyebrow coral">OURVERSE HOME</p>
+                <h3 id="dashboard-title"><span id="dashboard-greeting">우리의 오늘</span>을 한눈에</h3>
+                <p>함께 결정할 일과 다가오는 순간, OUR PET 상태를 확인하세요.</p>
+              </div>
+              <button id="dashboard-refresh" class="decision-secondary" type="button">대시보드 새로고침</button>
+            </header>
+
+            <div class="dashboard-grid">
+              <article class="dashboard-card dashboard-card-wide">
+                <div class="dashboard-card-heading">
+                  <div><span class="dashboard-icon coral">◌</span><h4>진행 중인 공동결정</h4></div>
+                  <a href="#decision-workspace">공동결정 보기 →</a>
+                </div>
+                <div id="dashboard-active-list" class="dashboard-items" aria-live="polite"><p class="dashboard-empty">불러오는 중이에요.</p></div>
+              </article>
+
+              <article class="dashboard-card">
+                <div class="dashboard-card-heading">
+                  <div><span class="dashboard-icon sage">✓</span><h4>최근 확정된 결정</h4></div>
+                  <span class="live-badge">실제 API</span>
+                </div>
+                <div id="dashboard-confirmed-list" class="dashboard-items" aria-live="polite"><p class="dashboard-empty">불러오는 중이에요.</p></div>
+              </article>
+
+              <article class="dashboard-card">
+                <div class="dashboard-card-heading">
+                  <div><span class="dashboard-icon amber">□</span><h4>다가오는 일정</h4></div>
+                  <span class="mock-badge">테스트 데이터</span>
+                </div>
+                <div id="dashboard-schedule-list" class="dashboard-items"></div>
+              </article>
+
+              <article class="dashboard-card dashboard-pet-card">
+                <div class="dashboard-card-heading">
+                  <div><span class="dashboard-icon ink">PET</span><h4>OUR PET 상태</h4></div>
+                  <span class="mock-badge">테스트 데이터</span>
+                </div>
+                <div class="dashboard-pet-summary">
+                  <span class="pet-placeholder" aria-hidden="true">●ᴥ●</span>
+                  <div><strong>몽글이 · Lv. 3</strong><p id="dashboard-pet-connection">PET DOCK 연결 대기</p></div>
+                </div>
+                <div class="pet-progress" aria-label="펫 경험치 65%"><span style="width:65%"></span></div>
+                <small>다음 레벨까지 35 EXP</small>
+              </article>
+            </div>
+          </section>
 
           <!-- TWO-PICK P0 shared decision workflow; PET DOCK remains independent. -->
           <section id="decision-workspace" class="decision-workspace hidden" aria-labelledby="decision-workspace-heading">
