@@ -38,7 +38,9 @@ Authorization: Bearer <redacted-jwt>
 
 인증이 없거나 무효면 401, 커플 미가입이면 409다. 상대 커플의 기록은 목록에 포함되지 않는다. 현재 API 계약의 요청·응답 필드와 상태 코드는 `API_CONTRACT.md`를 기준으로 한다.
 
-## 미완료·팀장 확인
+## 1차 작업 당시 미완료·팀장 확인 기록
+
+아래는 `31ea448` 분기 시점의 이력이며, 2차 백엔드 변경의 최신 상태가 아니다. 최신 계약은 `API_CONTRACT.md`의 2차 백엔드 계약을 확인한다.
 
 - 초대 코드 만료 시간이 확정되지 않아 만료 처리는 구현하지 않았다.
 - 피드백 점수 범위와 상대방 공개 범위가 미확정이므로 만족도 API를 생성하지 않았다.
@@ -46,3 +48,12 @@ Authorization: Bearer <redacted-jwt>
 - 기존 확정 Decision의 불변 기록 backfill은 별도 백업·감사 후 수행해야 한다.
 - 승인·추천·후보 동시 요청의 원자성, 다중 프로세스의 동시 커플 참여, 실제 브라우저 통합은 추가 검증 대상이다. 이번 동시 참여 테스트는 파일 SQLite와 단일 FastAPI 프로세스의 두 요청 범위다.
 - 최종 WBS 상태와 Notion 업데이트는 팀장 검수 후 결정한다. 이 문서는 Notion을 수정하지 않는다.
+
+## 2차 백엔드 연동 참고
+
+- 초대 코드는 신규 발급 후 24시간 유효하며, 한 명만 연결된 구성원은 `POST /couples/invite-code`로 재발급한다. 만료·비활성 코드는 410이다.
+- 추천 실패 후 조건 수정·재추천은 409다. 수동 후보 등록 또는 새 Decision 생성 경로를 제공한다.
+- `GET/PUT /decisions/{decision_id}/feedback/me`는 확정 결정에 대한 본인 평가만 처리한다. 상대의 점수와 의견은 노출되지 않는다.
+- `POST/GET /schedules`, `GET/PUT/DELETE /schedules/{schedule_id}`는 현재 커플의 한국 현지 일정 CRUD다. `kind`, `local_date`, `local_time`, `repeat_rule`을 사용한다.
+- `GET/PUT /notifications/settings/me`는 본인 알림 동의·철회를 처리한다. 기본값은 미동의다. 일정/동의 변경 시 내부 미발송 작업을 갱신한다.
+- 실제 n8n 전송 및 Gmail 발송, 재시도 worker는 아직 없다. 프론트엔드는 알림 예약을 실제 발송 완료로 표시하면 안 된다.

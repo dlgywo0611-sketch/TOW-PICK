@@ -1,4 +1,5 @@
 import secrets
+from datetime import timedelta, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -9,8 +10,9 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, aliased, selectinload
 
 import models
+import notification_logic
 import schemas
-from database import Base, engine, get_db
+from database import Base, engine, ensure_current_candidate_index, get_db
 from recommendation_engine import choose_balanced_option
 
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -26,6 +28,7 @@ from auth import (
 )
 
 Base.metadata.create_all(bind=engine)
+ensure_current_candidate_index(engine)
 
 app = FastAPI(
     title="TOW-PICK API",
@@ -83,6 +86,38 @@ def get_decision_for_current_couple(
         )
 
     return decision
+
+
+def begin_sqlite_write(db: Session) -> None:
+    """Serialize read/modify/write decision operations across SQLite processes."""
+    if db.bind.dialect.name != "sqlite":
+        return
+    try:
+        db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    except OperationalError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Concurrent update; retry the request",
+        ) from error
+
+
+def new_invite_code(db: Session) -> str:
+    while True:
+        code = secrets.token_hex(4).upper()
+        if db.scalar(select(models.Couple.id).where(
+            models.Couple.invite_code == code
+        )) is None:
+            return code
+
+
+def invite_is_active(invite: models.CoupleInvite | None) -> bool:
+    if invite is None or invite.used_at is not None:
+        return False
+    issued = invite.issued_at
+    if issued.tzinfo is None:
+        issued = issued.replace(tzinfo=timezone.utc)
+    return models.utc_now() < issued + timedelta(hours=24)
 
 
 def build_decision_detail(
@@ -285,6 +320,8 @@ def create_couple(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    begin_sqlite_write(db)
+    db.refresh(current_user)
     user = current_user
 
     if user.couple_id is not None:
@@ -293,19 +330,15 @@ def create_couple(
             detail="User already belongs to a couple",
         )
 
-    while True:
-        invite_code = secrets.token_hex(4).upper()
-        existing_couple = db.scalar(
-            select(models.Couple).where(
-                models.Couple.invite_code == invite_code
-            )
-        )
-        if existing_couple is None:
-            break
-
-    couple = models.Couple(invite_code=invite_code)
+    couple = models.Couple(invite_code=new_invite_code(db))
     db.add(couple)
     db.flush()
+
+    db.add(models.CoupleInvite(
+        couple_id=couple.id,
+        code=couple.invite_code,
+        issued_at=models.utc_now(),
+    ))
 
     user.couple_id = couple.id
     db.commit()
@@ -314,12 +347,41 @@ def create_couple(
     return created_couple
 
 
+@app.post("/couples/invite-code", response_model=schemas.CoupleRead)
+def reissue_couple_invite(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    begin_sqlite_write(db)
+    if current_user.couple_id is None:
+        raise HTTPException(status_code=409, detail="User does not belong to a couple")
+    couple = get_couple_with_members(db, current_user.couple_id)
+    if couple is None:
+        raise HTTPException(status_code=404, detail="Couple not found")
+    if len(couple.members) != 1:
+        raise HTTPException(status_code=409, detail="Couple already has two members")
+    code = new_invite_code(db)
+    couple.invite_code = code
+    invite = db.get(models.CoupleInvite, couple.id)
+    if invite is None:
+        invite = models.CoupleInvite(couple_id=couple.id, code=code,
+                                     issued_at=models.utc_now())
+        db.add(invite)
+    else:
+        invite.code = code
+        invite.issued_at = models.utc_now()
+        invite.used_at = None
+    db.commit()
+    return get_couple_with_members(db, couple.id)
+
+
 @app.post("/couples/join", response_model=schemas.CoupleRead)
 def join_couple(
     request: schemas.CoupleJoin,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    begin_sqlite_write(db)
     user = current_user
 
     if user.couple_id is not None:
@@ -348,6 +410,13 @@ def join_couple(
             detail="Couple already has two members",
         )
 
+    invite = db.get(models.CoupleInvite, couple.id)
+    if not invite_is_active(invite) or invite.code != couple.invite_code:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Invite code expired or inactive",
+        )
+
     member = aliased(models.User)
     member_count = select(func.count(member.id)).where(
         member.couple_id == couple.id
@@ -368,6 +437,7 @@ def join_couple(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Couple already has two members",
             )
+        invite.used_at = models.utc_now()
         db.commit()
     except OperationalError as error:
         db.rollback()
@@ -492,6 +562,7 @@ def upsert_my_decision_condition(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    begin_sqlite_write(db)
     if current_user.couple_id is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -519,6 +590,17 @@ def upsert_my_decision_condition(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Conditions cannot be changed after candidate creation",
+        )
+
+    attempt_id = db.scalar(
+        select(models.DecisionRecommendationAttempt.id).where(
+            models.DecisionRecommendationAttempt.decision_id == decision.id
+        )
+    )
+    if attempt_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Conditions cannot be changed after recommendation attempt",
         )
 
     condition = db.scalar(
@@ -641,6 +723,7 @@ def recommend_candidate(
     Scores and individual private preferences never leave the server.
     This does not claim real price or booking verification.
     """
+    begin_sqlite_write(db)
     if current_user.couple_id is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -753,6 +836,7 @@ def create_decision_candidate(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    begin_sqlite_write(db)
     decision = db.get(models.Decision, decision_id)
 
     if decision is None:
@@ -836,6 +920,7 @@ def approve_candidate(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    begin_sqlite_write(db)
     candidate = db.get(models.DecisionCandidate, candidate_id)
 
     if candidate is None:
@@ -942,6 +1027,194 @@ def read_decision_confirmations(
         .where(models.Decision.couple_id == current_user.couple_id)
         .order_by(models.DecisionConfirmation.id.desc())
     ).all())
+
+
+@app.put(
+    "/decisions/{decision_id}/feedback/me",
+    response_model=schemas.DecisionFeedbackRead,
+)
+def upsert_my_feedback(
+    decision_id: int,
+    request: schemas.DecisionFeedbackUpsert,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    begin_sqlite_write(db)
+    if current_user.couple_id is None:
+        raise HTTPException(status_code=409, detail="User does not belong to a couple")
+    decision = get_decision_for_current_couple(db, decision_id, current_user)
+    if decision.status != "confirmed":
+        raise HTTPException(status_code=409, detail="Decision is not confirmed")
+    feedback = db.scalar(select(models.DecisionFeedback).where(
+        models.DecisionFeedback.decision_id == decision.id,
+        models.DecisionFeedback.user_id == current_user.id,
+    ))
+    if feedback is None:
+        feedback = models.DecisionFeedback(
+            decision_id=decision.id, user_id=current_user.id,
+            **request.model_dump(),
+        )
+        db.add(feedback)
+    else:
+        feedback.score = request.score
+        feedback.comment = request.comment
+    db.commit()
+    db.refresh(feedback)
+    return feedback
+
+
+@app.get(
+    "/decisions/{decision_id}/feedback/me",
+    response_model=schemas.DecisionFeedbackRead,
+)
+def read_my_feedback(
+    decision_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.couple_id is None:
+        raise HTTPException(status_code=409, detail="User does not belong to a couple")
+    decision = get_decision_for_current_couple(db, decision_id, current_user)
+    feedback = db.scalar(select(models.DecisionFeedback).where(
+        models.DecisionFeedback.decision_id == decision.id,
+        models.DecisionFeedback.user_id == current_user.id,
+    ))
+    if feedback is None:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    return feedback
+
+
+def require_couple(current_user: models.User) -> int:
+    if current_user.couple_id is None:
+        raise HTTPException(status_code=409, detail="User does not belong to a couple")
+    return current_user.couple_id
+
+
+def get_my_schedule(db: Session, schedule_id: int,
+                    current_user: models.User) -> models.CoupleSchedule:
+    require_couple(current_user)
+    schedule = db.get(models.CoupleSchedule, schedule_id)
+    if schedule is None or schedule.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    if schedule.couple_id != current_user.couple_id:
+        raise HTTPException(status_code=403, detail="You cannot access this schedule")
+    return schedule
+
+
+@app.post("/schedules", response_model=schemas.CoupleScheduleRead, status_code=201)
+def create_schedule(request: schemas.CoupleScheduleInput,
+                    db: Session = Depends(get_db),
+                    current_user: models.User = Depends(get_current_user)):
+    begin_sqlite_write(db)
+    couple_id = require_couple(current_user)
+    schedule = models.CoupleSchedule(
+        couple_id=couple_id, created_by_id=current_user.id,
+        **request.model_dump(),
+    )
+    db.add(schedule)
+    db.flush()
+    notification_logic.plan_next_jobs(db, schedule)
+    db.commit()
+    db.refresh(schedule)
+    return schedule
+
+
+@app.get("/schedules", response_model=list[schemas.CoupleScheduleRead])
+def read_schedules(db: Session = Depends(get_db),
+                   current_user: models.User = Depends(get_current_user)):
+    couple_id = require_couple(current_user)
+    return list(db.scalars(select(models.CoupleSchedule).where(
+        models.CoupleSchedule.couple_id == couple_id,
+        models.CoupleSchedule.deleted_at.is_(None),
+    ).order_by(models.CoupleSchedule.local_date, models.CoupleSchedule.id)).all())
+
+
+@app.get("/schedules/{schedule_id}", response_model=schemas.CoupleScheduleRead)
+def read_schedule(schedule_id: int, db: Session = Depends(get_db),
+                  current_user: models.User = Depends(get_current_user)):
+    return get_my_schedule(db, schedule_id, current_user)
+
+
+@app.put("/schedules/{schedule_id}", response_model=schemas.CoupleScheduleRead)
+def update_schedule(schedule_id: int, request: schemas.CoupleScheduleInput,
+                    db: Session = Depends(get_db),
+                    current_user: models.User = Depends(get_current_user)):
+    begin_sqlite_write(db)
+    schedule = get_my_schedule(db, schedule_id, current_user)
+    notification_logic.cancel_pending(db, schedule_id=schedule.id)
+    for field, value in request.model_dump().items():
+        setattr(schedule, field, value)
+    schedule.revision += 1
+    notification_logic.plan_next_jobs(db, schedule)
+    db.commit()
+    db.refresh(schedule)
+    return schedule
+
+
+@app.delete("/schedules/{schedule_id}", status_code=204)
+def delete_schedule(schedule_id: int, db: Session = Depends(get_db),
+                    current_user: models.User = Depends(get_current_user)):
+    begin_sqlite_write(db)
+    schedule = get_my_schedule(db, schedule_id, current_user)
+    notification_logic.cancel_pending(db, schedule_id=schedule.id)
+    schedule.deleted_at = models.utc_now()
+    schedule.revision += 1
+    db.commit()
+
+
+def setting_response(user_id: int, setting: models.NotificationSetting | None):
+    if setting is None:
+        return schemas.NotificationSettingRead(
+            user_id=user_id, consent=False, d1_enabled=False,
+            day_of_enabled=False, send_time="09:00:00",
+            policy_version=notification_logic.POLICY_VERSION,
+        )
+    return setting
+
+
+@app.get("/notifications/settings/me", response_model=schemas.NotificationSettingRead)
+def read_my_notification_setting(db: Session = Depends(get_db),
+                                 current_user: models.User = Depends(get_current_user)):
+    return setting_response(current_user.id,
+                            db.get(models.NotificationSetting, current_user.id))
+
+
+@app.put("/notifications/settings/me", response_model=schemas.NotificationSettingRead)
+def update_my_notification_setting(request: schemas.NotificationSettingInput,
+                                   db: Session = Depends(get_db),
+                                   current_user: models.User = Depends(get_current_user)):
+    begin_sqlite_write(db)
+    setting = db.get(models.NotificationSetting, current_user.id)
+    was_consented = setting.consent if setting is not None else False
+    if setting is None:
+        setting = models.NotificationSetting(
+            user_id=current_user.id, policy_version=notification_logic.POLICY_VERSION,
+            **request.model_dump(),
+        )
+        db.add(setting)
+    else:
+        for field, value in request.model_dump().items():
+            setattr(setting, field, value)
+    now = models.utc_now()
+    if request.consent and not was_consented:
+        setting.consented_at = now
+        setting.policy_version = notification_logic.POLICY_VERSION
+    if not request.consent:
+        if was_consented:
+            setting.withdrawn_at = now
+        notification_logic.cancel_pending(db, recipient_user_id=current_user.id)
+    db.flush()
+    if request.consent and current_user.couple_id is not None:
+        notification_logic.cancel_pending(db, recipient_user_id=current_user.id)
+        schedules = db.scalars(select(models.CoupleSchedule).where(
+            models.CoupleSchedule.couple_id == current_user.couple_id,
+            models.CoupleSchedule.deleted_at.is_(None),
+        )).all()
+        for schedule in schedules:
+            notification_logic.plan_next_jobs(db, schedule)
+    db.commit()
+    db.refresh(setting)
+    return setting
 
 @app.post("/messages", response_model=schemas.MessageRead)
 def create_message(
