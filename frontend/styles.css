@@ -129,6 +129,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .petdock-console { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 12px; padding: 16px; border-radius: 11px; background: #252522; color: white; }
 .petdock-console span { display: block; margin-bottom: 5px; color: #aaa69e; font-size: 8px; font-weight: 900; letter-spacing: .08em; }
 .petdock-console strong { font-size: 11px; }
+.pet-event-meta { display: block; margin-top: 6px; color: #aaa69e; font-size: 8px; font-weight: 800; }
 .led-controls { display: flex; gap: 8px; }
 .led { width: 29px; height: 29px; border: 2px solid rgba(255, 255, 255, .5); border-radius: 50%; }
 .led.red { background: #ef5b55; }

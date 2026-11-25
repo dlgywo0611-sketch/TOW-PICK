@@ -8,6 +8,7 @@
     <title>OURVERSE — TWO PICK</title>
     <link rel="stylesheet" href="/static/styles.css?v=20261125" />
     <script src="/static/error-handling-logic.js" defer></script>
+    <script src="/static/session-scope-logic.js" defer></script>
     <script src="/static/petdock-bridge.js" defer></script>
     <script src="/static/app.js" defer></script>
     <script src="/static/decision-flow-logic.js" defer></script>
@@ -492,8 +493,8 @@
               <article class="device-card">
                 <span class="device-icon coral-device">BLE</span>
                 <div>
-                  <strong>Meem LED</strong>
-                  <p>FFE0 서비스 · FFE1 특성</p>
+                  <strong>Meem LED · 버튼</strong>
+                  <p id="ble-notify-status">FFE1 LED 제어 · 버튼 Notify 연결 대기</p>
                 </div>
                 <div class="device-actions">
                   <button id="connect-ble" class="device-button" type="button">블루투스 연결</button>
@@ -514,6 +515,7 @@
               <div>
                 <span>최근 펫 이벤트</span>
                 <strong id="pet-event" aria-live="polite">버튼 입력을 기다리고 있어요.</strong>
+                <small id="pet-event-meta" class="pet-event-meta" aria-live="polite">입력 출처 - · 누적 0회 (A 0 / B 0)</small>
               </div>
               <div id="led-controls" class="led-controls" aria-label="LED 색상 선택">
                 <button data-led="red" class="led red" type="button" disabled aria-label="LED 빨강"></button>

@@ -33,3 +33,7 @@ jobs:
         run: npm test
       - name: All frontend JavaScript syntax
         run: npm run test:syntax
+      - name: PET DOCK regression
+        run: |
+          node tests/usb-reconnect.test.cjs
+          node tests/ble-notify.test.cjs

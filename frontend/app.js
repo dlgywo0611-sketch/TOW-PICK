@@ -37,11 +37,20 @@ const elements = {
   petdockErrorMessage: document.querySelector('#petdock-error-message'),
   dismissPetdockError: document.querySelector('#dismiss-petdock-error'),
   petEvent: document.querySelector('#pet-event'),
+  petEventMeta: document.querySelector('#pet-event-meta'),
+  bleNotifyStatus: document.querySelector('#ble-notify-status'),
   ledControls: document.querySelector('#led-controls'),
 };
 
 const petDock = new PetDockBridge();
-const deviceState = { usb: false, ble: false };
+const deviceState = {
+  usb: false,
+  ble: false,
+  bleNotifySupported: null,
+  bleNotifyActive: false,
+};
+const sessionScope = globalThis.TwoPickSessionScopeLogic.createSessionScope();
+const isStaleSessionError = (error) => error?.staleSession === true;
 const requestState = { pending: 0, mutations: new Set() };
 const requestUi = {
   loading: document.querySelector('#global-loading'),
@@ -81,6 +90,7 @@ const errorMessages = {
 };
 
 function showAlert(message, success = false) {
+  if (!message) return;
   elements.alert.textContent = message;
   elements.alert.classList.remove('hidden', 'success');
   if (success) elements.alert.classList.add('success');
@@ -101,6 +111,15 @@ function renderDeviceState() {
   elements.connectBle.textContent = deviceState.ble ? '블루투스 연결됨' : '블루투스 연결';
   elements.connectBle.disabled = deviceState.ble;
   elements.disconnectBle.classList.toggle('hidden', !deviceState.ble);
+  if (!deviceState.ble) {
+    elements.bleNotifyStatus.textContent = 'FFE1 LED 제어 · 버튼 Notify 연결 대기';
+  } else if (deviceState.bleNotifyActive) {
+    elements.bleNotifyStatus.textContent = 'FFE1 LED 제어 · 버튼 Notify 수신 중';
+  } else if (deviceState.bleNotifySupported === false) {
+    elements.bleNotifyStatus.textContent = 'FFE1 Notify 미지원 · LED 제어만 사용';
+  } else {
+    elements.bleNotifyStatus.textContent = 'FFE1 Notify 시작 실패 · LED 제어만 사용';
+  }
   elements.ledControls.querySelectorAll('button').forEach((button) => {
     button.disabled = !deviceState.ble;
   });
@@ -125,9 +144,10 @@ function setButtonBusy(button, busy, label) {
 }
 
 async function api(path, options = {}) {
+  const sessionSnapshot = sessionScope.snapshot();
   const logic = globalThis.TwoPickErrorHandlingLogic;
   const method = String(options.method || 'GET').toUpperCase();
-  const mutationKey = `${method}:${path}`;
+  const mutationKey = `${sessionSnapshot}:${method}:${path}`;
   if (logic.isMutation(method) && requestState.mutations.has(mutationKey)) {
     throw new Error('이미 처리 중인 요청이에요. 잠시만 기다려 주세요.');
   }
@@ -145,8 +165,10 @@ async function api(path, options = {}) {
   document.body.setAttribute('aria-busy', 'true');
   try {
     const response = await fetch(path, { ...options, headers, signal: options.signal || controller.signal });
+    if (!sessionScope.isCurrent(sessionSnapshot)) throw globalThis.TwoPickSessionScopeLogic.staleSessionError();
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
+      if (!sessionScope.isCurrent(sessionSnapshot)) throw globalThis.TwoPickSessionScopeLogic.staleSessionError();
       const message = logic.normalizeApiDetail(payload.detail, errorMessages);
       if (response.status === 401 && state.token && path !== '/token') {
         clearSession();
@@ -158,8 +180,12 @@ async function api(path, options = {}) {
       requestError.detail = payload.detail;
       throw requestError;
     }
-    return response.status === 204 ? null : response.json();
+    if (response.status === 204) return null;
+    const payload = await response.json();
+    if (!sessionScope.isCurrent(sessionSnapshot)) throw globalThis.TwoPickSessionScopeLogic.staleSessionError();
+    return payload;
   } catch (error) {
+    if (isStaleSessionError(error)) throw error;
     if (error instanceof TypeError || error?.name === 'AbortError') throw new Error(logic.friendlyFetchError(error));
     throw error;
   } finally {
@@ -181,11 +207,13 @@ window.addEventListener('offline', renderNetworkState);
 renderNetworkState();
 
 function saveToken(token) {
+  sessionScope.invalidate();
   state.token = token;
   sessionStorage.setItem('tow_pick_token', token);
 }
 
 function clearSession() {
+  sessionScope.invalidate();
   state.token = null;
   state.user = null;
   state.couple = null;
@@ -202,6 +230,13 @@ function render() {
   document.querySelector('.step:first-child').classList.toggle('active', !authenticated);
 
   if (!authenticated) {
+    elements.profileName.textContent = '사용자';
+    elements.profileAvatar.textContent = '?';
+    elements.logoutButton.removeAttribute('aria-label');
+    elements.connectionActions.classList.remove('hidden');
+    elements.connectedCard.classList.add('hidden');
+    elements.coupleStatus.classList.remove('online');
+    elements.coupleStatus.innerHTML = '<i></i> 연결 전';
     window.dispatchEvent(new Event('twopick:session-changed'));
     return;
   }
@@ -251,6 +286,7 @@ async function loadCurrentSession() {
       if (error.message !== errorMessages['User does not belong to a couple']) throw error;
     }
   } catch (error) {
+    if (isStaleSessionError(error)) return false;
     clearSession();
     showAlert(error.message);
     render();
@@ -424,8 +460,14 @@ elements.connectBle.addEventListener('click', async () => {
   hideDeviceError();
   setButtonBusy(elements.connectBle, true, '검색 중…');
   try {
-    await petDock.connectBluetooth();
-    showAlert('Meem 블루투스가 연결되었습니다.', true);
+    const result = await petDock.connectBluetooth();
+    if (result.notifyActive) {
+      showAlert('Meem 블루투스와 버튼 Notify가 연결되었습니다.', true);
+    } else if (!result.notifySupported) {
+      showAlert('Meem이 연결되었습니다. FFE1 Notify 미지원으로 LED 제어만 사용합니다.', true);
+    } else {
+      showAlert(`Meem이 연결되었습니다. Notify 시작 실패로 LED 제어만 사용합니다. (${result.notifyError})`);
+    }
   } catch (error) {
     showAlert(error.message);
     showDeviceError(error.message);
@@ -468,6 +510,8 @@ petDock.addEventListener('usbstate', (event) => {
 
 petDock.addEventListener('blestate', (event) => {
   deviceState.ble = event.detail.connected;
+  deviceState.bleNotifySupported = event.detail.notifySupported;
+  deviceState.bleNotifyActive = event.detail.notifyActive;
   renderDeviceState();
   if (!event.detail.connected && event.detail.reason) showDeviceError(event.detail.reason);
 });
@@ -476,6 +520,8 @@ petDock.addEventListener('button', (event) => {
   elements.petEvent.textContent = event.detail.button === 'A'
     ? '펫 반응 요청 (버튼 A)'
     : '펫 상태 확인 (버튼 B)';
+  elements.petEventMeta.textContent = `입력 출처 ${event.detail.source} · 누적 ${event.detail.count}회 `
+    + `(A ${event.detail.counts.A} / B ${event.detail.counts.B})`;
 });
 
 petDock.addEventListener('led', (event) => {

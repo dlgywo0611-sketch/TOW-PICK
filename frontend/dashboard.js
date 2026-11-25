@@ -15,7 +15,7 @@
     pet: root.querySelector('#dashboard-pet-connection'),
     couple: root.querySelector('#dashboard-couple-summary'), notifications: root.querySelector('#dashboard-notification-summary'),
   };
-  let busy = false;
+  let busy = false; let ownerId = null;
 
   function escapeHtml(value) {
     return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
@@ -45,13 +45,14 @@
     else ui.active.innerHTML = summary.active.map((item) => `<a class="dashboard-item" href="#decision"><span class="dashboard-dot"></span><div><strong>${escapeHtml(item.title)}</strong><small>진행 중 · 이어서 조건이나 승인을 확인하세요.</small></div><span>→</span></a>`).join('');
 
     if (!summary.confirmed.length) renderEmpty(ui.confirmed, '최근 확정된 결정이 아직 없어요.');
-    else ui.confirmed.innerHTML = summary.confirmed.map((item) => `<div class="dashboard-item"><span class="dashboard-check">✓</span><div><strong>${escapeHtml(item.confirmation?.content_snapshot || item.title)}</strong><small>${item.confirmation?.confirmed_at ? new Date(item.confirmation.confirmed_at).toLocaleDateString('ko-KR') : '확정 완료'}</small></div></div>`).join('');
+    else ui.confirmed.innerHTML = summary.confirmed.map((item) => `<div class="dashboard-item"><span class="dashboard-check">✓</span><div><strong>${escapeHtml(item.confirmation?.content_snapshot || item.title)}</strong><small>${item.confirmation?.confirmed_at ? new Date(item.confirmation.confirmed_at).toLocaleDateString('ko-KR', { timeZone: scheduleLogic.SEOUL_TIME_ZONE }) : '확정 완료'}</small></div></div>`).join('');
   }
 
   async function refresh() {
     const active = Boolean(state.user && state.token && state.couple?.members?.length === 2);
     root.classList.toggle('hidden', !active);
-    if (!active || busy) return;
+    if (!active) { renderEmpty(ui.active, '로그인 후 확인할 수 있어요.'); renderEmpty(ui.confirmed, '최근 확정 기록이 없어요.'); renderEmpty(ui.schedules, '다가오는 일정이 없어요.'); ui.notifications.textContent = ''; return; }
+    if (busy) return;
     busy = true;
     ui.refresh.disabled = true;
     ui.refresh.textContent = '불러오는 중…';
@@ -65,8 +66,7 @@
       renderDecisions(decisions, confirmations);
       renderSchedules(schedules); renderNotificationSetting(notificationSetting);
     } catch (error) {
-      renderEmpty(ui.active, error.message);
-      renderEmpty(ui.confirmed, '결정 기록을 불러오지 못했어요.');
+      if (!isStaleSessionError(error)) { renderEmpty(ui.active, error.message); renderEmpty(ui.confirmed, '결정 기록을 불러오지 못했어요.'); }
     } finally {
       busy = false;
       ui.refresh.disabled = false;
@@ -75,7 +75,8 @@
   }
 
   ui.refresh.addEventListener('click', refresh);
-  window.addEventListener('twopick:session-changed', refresh);
+  function onSessionChange() { const nextOwnerId = state.user?.id ?? null; if (nextOwnerId !== ownerId) { ownerId = nextOwnerId; busy = false; } void refresh(); }
+  window.addEventListener('twopick:session-changed', onSessionChange);
   window.addEventListener('twopick:decisions-changed', refresh);
   window.addEventListener('twopick:schedules-changed', (event) => renderSchedules(event.detail.schedules));
   window.addEventListener('twopick:notification-settings-changed', (event) => renderNotificationSetting(event.detail));
