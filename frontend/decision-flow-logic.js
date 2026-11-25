@@ -94,8 +94,33 @@
     };
   }
 
+  function getDecisionStage(detail, statuses, userId) {
+    if (detail?.confirmed || detail?.status === 'confirmed') {
+      return { key: 'confirmed', index: 3, message: '두 사람의 승인이 모여 최종 결정이 확정됐어요.' };
+    }
+    if (!conditionsReady(statuses)) {
+      const mine = statuses?.member_conditions?.find((item) => item.user_id === userId)?.submitted === true;
+      return {
+        key: 'conditions',
+        index: 0,
+        message: mine ? '내 조건은 제출됐어요. 상대방의 비공개 조건 제출을 기다리고 있어요.' :
+          '내 비공개 조건을 먼저 저장해 주세요. 상대방에게는 제출 여부만 보여요.',
+      };
+    }
+    if (!detail?.current_candidate) {
+      return { key: 'candidate', index: 1, message: '두 사람의 조건이 준비됐어요. 추천을 실행하거나 후보를 직접 등록해 주세요.' };
+    }
+    const mine = detail.current_candidate.member_approvals?.find((item) => item.user_id === userId)?.approved === true;
+    return {
+      key: 'approval',
+      index: 2,
+      message: mine ? '내 승인은 완료됐어요. 상대방이 최신 후보를 승인하면 확정됩니다.' :
+        '최신 후보를 확인한 뒤 내 계정에서 직접 승인해 주세요.',
+    };
+  }
+
   const logic = { splitTags, makeOptions, canEditConditions, conditionsReady,
-    canRecommend, canApprove, getMemberStates, getRecommendationFallbackState };
+    canRecommend, canApprove, getMemberStates, getRecommendationFallbackState, getDecisionStage };
   if (typeof module !== 'undefined' && module.exports) module.exports = logic;
   root.TwoPickDecisionLogic = logic;
 }(typeof globalThis !== 'undefined' ? globalThis : this));

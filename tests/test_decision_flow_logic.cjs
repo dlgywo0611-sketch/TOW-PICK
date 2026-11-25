@@ -82,6 +82,16 @@ test('recommendation failure exposes a safe manual fallback', () => {
   const withCandidate = logic.getRecommendationFallbackState(decision({ id: 3 }), both, true, '실패');
   assert.equal(withCandidate.visible, false);
 });
+test('decision stage explains condition, candidate, approval and confirmation waits', () => {
+  const waiting = { member_conditions: [{ user_id: 1, submitted: true }, { user_id: 2, submitted: false }] };
+  assert.equal(logic.getDecisionStage(decision(), waiting, 1).key, 'conditions');
+  assert.match(logic.getDecisionStage(decision(), waiting, 1).message, /상대방/);
+  assert.equal(logic.getDecisionStage(decision(), both, 1).key, 'candidate');
+  const candidate = { id: 3, member_approvals: [{ user_id: 1, approved: true }, { user_id: 2, approved: false }] };
+  assert.equal(logic.getDecisionStage(decision(candidate), both, 1).key, 'approval');
+  assert.match(logic.getDecisionStage(decision(candidate), both, 1).message, /상대방/);
+  assert.equal(logic.getDecisionStage(decision(candidate, 'confirmed', true), both, 1).key, 'confirmed');
+});
 test('web script uses existing auth and decision endpoints, not PET DOCK approval', () => {
   const js = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'decision-flow.js'), 'utf8');
   for (const endpoint of ["'/decisions'", '/conditions/me', '/conditions/status', '/recommendations', '/candidates/', '/approve']) {
