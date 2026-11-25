@@ -45,7 +45,7 @@
   function renderDecisions(decisions, confirmations) {
     const summary = logic.summarizeDecisions(decisions, confirmations);
     if (!summary.active.length) renderEmpty(ui.active, '진행 중인 공동결정이 없어요. 새로운 결정을 시작해 보세요.');
-    else ui.active.innerHTML = summary.active.map((item) => `<a class="dashboard-item" href="#decision-workspace"><span class="dashboard-dot"></span><div><strong>${escapeHtml(item.title)}</strong><small>진행 중 · 이어서 조건이나 승인을 확인하세요.</small></div><span>→</span></a>`).join('');
+    else ui.active.innerHTML = summary.active.map((item) => `<a class="dashboard-item" href="#decision"><span class="dashboard-dot"></span><div><strong>${escapeHtml(item.title)}</strong><small>진행 중 · 이어서 조건이나 승인을 확인하세요.</small></div><span>→</span></a>`).join('');
 
     if (!summary.confirmed.length) renderEmpty(ui.confirmed, '최근 확정된 결정이 아직 없어요.');
     else ui.confirmed.innerHTML = summary.confirmed.map((item) => `<div class="dashboard-item"><span class="dashboard-check">✓</span><div><strong>${escapeHtml(item.confirmation?.content_snapshot || item.title)}</strong><small>${item.confirmation?.confirmed_at ? new Date(item.confirmation.confirmed_at).toLocaleDateString('ko-KR') : '확정 완료'}</small></div></div>`).join('');

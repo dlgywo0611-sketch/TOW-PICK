@@ -15,6 +15,8 @@
     <script src="/static/mock-features.js" defer></script>
     <script src="/static/dashboard-logic.js" defer></script>
     <script src="/static/dashboard.js" defer></script>
+    <script src="/static/service-shell-logic.js" defer></script>
+    <script src="/static/service-shell.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">본문으로 바로가기</a>
@@ -137,7 +139,16 @@
             </div>
           </article>
 
-          <section id="main-dashboard" class="dashboard-panel hidden" aria-labelledby="dashboard-title">
+          <nav id="service-nav" class="service-nav hidden" aria-label="서비스 메뉴">
+            <a href="#home" data-service-route="home"><span aria-hidden="true">⌂</span><strong>홈</strong></a>
+            <a href="#decision" data-service-route="decision"><span aria-hidden="true">◇</span><strong>공동결정</strong></a>
+            <a href="#history" data-service-route="history"><span aria-hidden="true">✓</span><strong>기록</strong></a>
+            <a href="#schedule" data-service-route="schedule"><span aria-hidden="true">□</span><strong>일정</strong></a>
+            <a href="#pet" data-service-route="pet"><span aria-hidden="true">●</span><strong>펫</strong></a>
+            <a href="#settings" data-service-route="settings"><span aria-hidden="true">⚙</span><strong>설정</strong></a>
+          </nav>
+
+          <section id="main-dashboard" class="dashboard-panel hidden" data-service-page="home" aria-labelledby="dashboard-title">
             <header class="dashboard-heading">
               <div>
                 <p class="eyebrow coral">OURVERSE HOME</p>
@@ -151,7 +162,7 @@
               <article class="dashboard-card dashboard-card-wide">
                 <div class="dashboard-card-heading">
                   <div><span class="dashboard-icon coral">◌</span><h4>진행 중인 공동결정</h4></div>
-                  <a href="#decision-workspace">공동결정 보기 →</a>
+                  <a href="#decision">공동결정 보기 →</a>
                 </div>
                 <div id="dashboard-active-list" class="dashboard-items" aria-live="polite"><p class="dashboard-empty">불러오는 중이에요.</p></div>
               </article>
@@ -188,7 +199,7 @@
           </section>
 
           <!-- TWO-PICK P0 shared decision workflow; PET DOCK remains independent. -->
-          <section id="decision-workspace" class="decision-workspace hidden" aria-labelledby="decision-workspace-heading">
+          <section id="decision-workspace" class="decision-workspace hidden" data-service-page="decision" aria-labelledby="decision-workspace-heading">
             <header class="decision-heading">
               <div>
                 <p class="eyebrow coral">STEP 03 & 04 · TWO PICK</p>
@@ -314,7 +325,7 @@
             </div>
           </section>
 
-          <section class="memories-panel" aria-labelledby="history-title">
+          <section class="memories-panel" data-service-page="history" aria-labelledby="history-title">
             <header class="memories-heading">
               <div>
                 <p class="eyebrow coral">DECISION ARCHIVE</p>
@@ -354,7 +365,7 @@
             </div>
           </section>
 
-          <section class="schedule-panel" aria-labelledby="schedule-title">
+          <section class="schedule-panel" data-service-page="schedule" aria-labelledby="schedule-title">
             <header class="memories-heading">
               <div>
                 <p class="eyebrow coral">COUPLE CALENDAR</p>
@@ -402,7 +413,7 @@
             </div>
           </section>
 
-          <section class="petdock-panel" aria-labelledby="petdock-title">
+          <section class="petdock-panel" data-service-page="pet" aria-labelledby="petdock-title">
             <header class="petdock-heading">
               <div>
                 <p class="eyebrow coral">PET DOCK · DEVICE</p>
@@ -459,6 +470,13 @@
               </div>
             </div>
             <p class="device-help">Windows Chrome/Edge의 localhost 또는 HTTPS에서 사용하세요. 장치 연결은 사용자가 버튼을 눌러 허용해야 합니다.</p>
+          </section>
+
+          <section id="settings-placeholder" class="settings-placeholder" data-service-page="settings" aria-labelledby="settings-placeholder-title">
+            <p class="eyebrow coral">ACCOUNT & PREFERENCES</p>
+            <h3 id="settings-placeholder-title">설정</h3>
+            <p>프로필, 알림 및 계정 관리 기능을 준비하고 있어요.</p>
+            <span class="mock-badge">화면 준비 중</span>
           </section>
         </section>
       </section>
