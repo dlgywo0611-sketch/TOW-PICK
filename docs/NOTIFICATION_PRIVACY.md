@@ -6,15 +6,15 @@
 - 작성일: 2026-11-24
 - 우선순위: P1
 - 완료 기준: 동의 없는 알림 전송 금지·민감 조건 미전송 원칙 확정
-- 구현 상태: **planned**
+- 구현 상태: **partial** (2026-11-25 2차 백엔드: 일정·동의·작업 원장 기반; 실제 발송 planned)
 
 ## 문서 범위와 현재 상태
 
 이 문서는 OURVERSE 3.0의 SMART COUPLE CARE에서 기념일 또는 일정 등록 후 n8n을 통해 알림을 발송하기 위한 설계 원칙을 정의한다.
 
-현재 저장소에는 일정 모델·API, 알림 동의 모델·API, 알림 작업 원장, n8n workflow, Gmail 발송 연동이 없다. 따라서 이 문서의 데이터 항목, 흐름과 처리 규칙은 모두 **설계 제안(planned)**이며 현재 구현된 API 계약이 아니다.
+현재 저장소에는 일정 모델·API, 사용자별 알림 동의 API, 미발송 작업 원장이 있다. 실제 n8n workflow, Gmail 발송, 발송 결과·재시도 worker는 아직 없다. 아래 원칙 중 실제 계약은 `API_CONTRACT.md`의 2026-11-25 2차 백엔드 계약을 따른다.
 
-프론트엔드와 n8n은 `API_CONTRACT.md`에 없는 endpoint나 schema를 임의로 가정하지 않는다. 실제 구현 전에 백엔드 API 계약과 DB migration을 별도로 확정해야 한다.
+프론트엔드와 n8n은 `API_CONTRACT.md`에 없는 발송 endpoint나 schema를 임의로 가정하지 않는다. n8n 연결과 실제 전송 전에는 인증·재시도·결과 기록 계약을 별도로 확정해야 한다.
 
 ## 1. 알림 목적과 범위
 
@@ -57,9 +57,9 @@
 
 일정이 커플 공유 데이터이더라도 수신 동의는 사용자 개인 단위로 관리한다.
 
-### 동의 기록 설계 제안 (`planned`)
+### 동의 기록과 후속 설계
 
-실제 필드와 테이블명은 백엔드 계약 전까지 확정하지 않는다. 최소한 다음 개념을 저장할 수 있어야 한다.
+현재 `NotificationSetting`은 사용자별 동의·종류·시각·정책 버전을 저장한다. 아래의 별도 채널별 동의 등은 아직 설계 제안이며 실제 필드와 계약이 없다.
 
 | 항목 | 목적 |
 |---|---|
@@ -125,7 +125,7 @@
 
 ## 4. n8n 데이터 흐름
 
-### 권장 흐름 (`planned`)
+### 권장 흐름 (예약 기반 partial, 발송 planned)
 
 ```text
 인증된 사용자가 기념일/일정 등록
@@ -183,9 +183,9 @@ dedupe_key = hash(
 )
 ```
 
-실제 hash 형식과 컬럼은 백엔드 계약 전까지 설계 제안이다. DB에는 `dedupe_key` unique constraint를 두어 여러 scheduler 또는 n8n 실행이 겹쳐도 같은 작업을 한 번만 claim하도록 한다.
+현재 백엔드는 위 요소를 `:`로 이어 SHA-256으로 해시하여 `dedupe_key` unique 컬럼에 저장한다. 이는 **중복 예약 방지**까지 구현한 것이다. 여러 scheduler 또는 n8n 실행의 원자적 claim·중복 발송 방지는 아직 구현하지 않았다.
 
-### 발송 원장 상태 — 설계 제안 (`planned`)
+### 발송 원장 상태 (현재 pending/canceled, 발송 상태 전이 planned)
 
 | 상태 | 의미 |
 |---|---|
@@ -221,12 +221,11 @@ dedupe_key = hash(
 ## 6. 시간대 기준
 
 - 한국 사용자 기준 timezone은 IANA 식별자 `Asia/Seoul`을 사용한다.
-- 단순한 `UTC+9` 문자열 대신 timezone이 포함된 시각을 저장하고 계산한다.
-- 일정 원본은 timezone과 함께 저장하거나 UTC 시각과 원본 timezone을 함께 보존한다.
+- 현재 일정 원본은 한국 현지 `local_date`와 선택 `local_time`으로 저장하고 API 응답에서 `Asia/Seoul`을 명시한다. 예정 작업 `send_at`은 UTC 시각으로 저장한다. 운영 환경에는 IANA timezone 데이터가 필요하며 Windows 개발 환경에서 데이터가 없으면 현대 한국 날짜에 한해 UTC+09:00으로 대체 계산한다.
 - D-1은 `Asia/Seoul`의 일정 날짜에서 calendar date 1일을 뺀 날짜다. 단순히 24시간을 빼는 방식으로 정의하지 않는다.
 - 당일 알림은 `Asia/Seoul`의 일정 날짜와 발송 날짜가 같은지 기준으로 한다.
 - 날짜 경계 판단은 backend에서 한 번 계산하고 n8n이 서로 다른 timezone으로 다시 해석하지 않도록 한다.
-- 발송 시각은 사용자 선택값을 우선하며, 선택 기능이 없을 경우 기본 시각을 제품 계약에서 별도로 확정한다. 이 문서에서는 임의의 기본 시각을 구현값으로 확정하지 않는다.
+- 백엔드 기본 발송 시각은 오전 9시 KST이며 사용자별 현지 시각 입력으로 바꿀 수 있다. 현재는 다음 반복 발생일의 미발송 작업만 예약한다.
 - 일정 시각 변경 시 revision을 증가시키고 이전 pending 작업을 취소한 뒤 새 시각으로 작업을 만든다.
 - 날짜·시각 테스트에는 23:59, 00:00, 월말, 연말, 윤년과 D-1 경계를 포함한다.
 
@@ -245,7 +244,7 @@ dedupe_key = hash(
 | 발송 결과 불명확 | provider 확인 전 중복 재발송 금지 | `processing` 또는 별도 unknown 사유 | 운영 확인 후 동일 작업 재개 |
 | 다른 커플 일정 접근 | 일정·알림 정보 미노출 | 작업 생성 없음 | 403 정책 적용 검토 |
 
-실제 상태명은 구현 전 schema에서 확정한다. 위 값은 설계 의미를 보여주는 제안이며 현재 API 응답값이 아니다.
+현재 내부 원장의 상태명은 `pending`, `canceled`다. 위 세부 예외 값은 향후 발송 worker 설계 제안이며 현재 API 응답값이 아니다.
 
 ## 8. 개인정보 및 보안
 
@@ -278,16 +277,16 @@ dedupe_key = hash(
 
 | 영역 | 구현 상태 | 테스트 상태 | 비고 |
 |---|---|---|---|
-| 일정 모델·API | planned | NOT TESTED | 현재 `models.py`, `main.py`에 없음 |
-| 사용자별 알림 동의·철회 | planned | NOT TESTED | 모델·API·UI 없음 |
-| 알림 작업·중복 방지 원장 | planned | NOT TESTED | unique key와 상태 모델 미구현 |
-| `Asia/Seoul` 예약 계산 | planned | NOT TESTED | scheduler 미구현 |
+| 일정 모델·API | implemented (backend) | PASS (자동 테스트) | 브라우저 UI 미연결 |
+| 사용자별 알림 동의·철회 | implemented (backend) | PASS (자동 테스트) | UI 미연결 |
+| 알림 작업·중복 방지 원장 | partial | PASS (예약·취소 Mock) | 발송 상태 전이·재시도 미구현 |
+| `Asia/Seoul` 예약 계산 | partial | PASS (자동 테스트) | 실제 장기 운영 scheduler 미구현 |
 | n8n workflow·Webhook | planned | NOT TESTED | workflow 생성·실행 안 됨 |
 | Gmail/테스트 메일 발송 | planned | NOT TESTED | 실제 발송 결과 없음 |
-| 실패 재시도·중복 방지 | planned | NOT TESTED | 구현·검증 없음 |
-| 개인정보 최소 payload | planned | NOT TESTED | 이 문서에서 원칙만 확정 |
+| 실패 재시도·중복 방지 | partial | 중복 예약 PASS, 재시도 NOT TESTED | 실제 발송 전 중복 차단은 미구현 |
+| 개인정보 최소 payload | partial | PASS (Mock) | 실제 n8n 전송은 NOT TESTED |
 
-이 표의 모든 기능은 planned다. 실제 workflow 실행, Gmail 발송, Webhook 수신 또는 중복 방지 시험을 수행한 것처럼 표시하지 않는다.
+실제 workflow 실행, Gmail 발송, Webhook 수신 및 발송 단계의 중복 차단은 수행하지 않았다. 예약 원장과 Mock payload 검증만 수행했다.
 
 ### 향후 검증 시나리오
 
@@ -322,7 +321,7 @@ dedupe_key = hash(
 | `Asia/Seoul` 기준 | D-1·당일 calendar date와 날짜 경계 원칙 정의 |
 | 실패·재시도 | 취소·skipped·failed 및 동일 작업 재시도 원칙 정의 |
 | P1 범위 정합성 | SMART COUPLE CARE 최소 시연 범위로 유지 |
-| API 계약 정합성 | endpoint/schema를 발명하지 않고 모두 planned로 구분 |
-| 실제 구현·시험 여부 | 모두 planned / NOT TESTED로 명시 |
+| API 계약 정합성 | 일정·알림 설정은 실제 endpoint/schema로 갱신, 실제 발송은 planned로 구분 |
+| 실제 구현·시험 여부 | 예약·동의 Mock 테스트와 미구현 n8n/Gmail을 분리해 명시 |
 
 따라서 WBS 1.2.8 완료 기준인 **“동의 없는 알림 전송 금지·민감 조건 미전송 원칙 확정”을 충족**한다. 이는 개인정보·알림 설계 산출물의 완료이며 일정 API, n8n workflow, Gmail 발송 또는 중복 방지 기능의 구현 완료를 의미하지 않는다.
