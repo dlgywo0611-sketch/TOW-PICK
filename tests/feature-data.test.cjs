@@ -8,7 +8,7 @@ const data = context.globalThis.TwoPickFeatureData;
 assert.equal(data.getFeatureSource('decisions'), 'api');
 assert.equal(data.getFeatureSource('history'), 'api');
 assert.equal(data.getFeatureSource('satisfaction'), 'api');
-assert.equal(data.getFeatureSource('schedules'), 'mock');
+assert.equal(data.getFeatureSource('schedules'), 'api');
 assert.equal(data.getFeatureSource('profileSettings'), 'local');
 assert.equal(data.getFeatureSource('missing'), 'unknown');
 const schedules = data.getMockData('schedules');

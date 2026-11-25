@@ -1,7 +1,7 @@
 (function exposeFeatureData(root) {
   const sources = Object.freeze({
     auth: 'api', couple: 'api', decisions: 'api', confirmations: 'api',
-    history: 'api', satisfaction: 'api', schedules: 'mock', notifications: 'mock',
+    history: 'api', satisfaction: 'api', schedules: 'api', notifications: 'mock',
     petGrowth: 'mock', profileSettings: 'local', notificationSettings: 'local',
   });
   const mockData = Object.freeze({
