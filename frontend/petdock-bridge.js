@@ -11,6 +11,10 @@ class PetDockBridge extends EventTarget {
     this._usbClosing = false;
     this.bluetoothDevice = null;
     this.bluetoothCharacteristic = null;
+    this._bleConnecting = false;
+    this._handleBluetoothDisconnect = () => this._clearBluetoothState(
+      '블루투스 연결이 끊겼습니다. 장치 전원과 거리를 확인한 뒤 다시 연결해 주세요.',
+    );
   }
 
   get supportsUsb() {
@@ -137,25 +141,56 @@ class PetDockBridge extends EventTarget {
     if (!this.supportsBluetooth) {
       throw new Error('블루투스 연결은 Windows Chrome/Edge의 HTTPS 또는 localhost에서 사용할 수 있어요.');
     }
+    if (this._bleConnecting) throw new Error('블루투스 장치를 검색하고 있습니다. 잠시만 기다려 주세요.');
+    if (this.bluetoothDevice) await this.disconnectBluetooth();
+    this._bleConnecting = true;
+    let device = null;
+    try {
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ name: 'Meem' }],
+        optionalServices: [PetDockBridge.BLE_SERVICE],
+      });
+      device.addEventListener('gattserverdisconnected', this._handleBluetoothDisconnect);
+      this.bluetoothDevice = device;
 
-    this.bluetoothDevice = await navigator.bluetooth.requestDevice({
-      filters: [{ name: 'Meem' }],
-      optionalServices: [PetDockBridge.BLE_SERVICE],
-    });
-    this.bluetoothDevice.addEventListener('gattserverdisconnected', () => {
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(PetDockBridge.BLE_SERVICE);
+      const characteristic = await service.getCharacteristic(PetDockBridge.BLE_CHARACTERISTIC);
+      if (!this.getBleWriteMode(characteristic)) {
+        throw new Error('Meem FFE1 특성이 BLE 쓰기를 지원하지 않습니다.');
+      }
+      this.bluetoothCharacteristic = characteristic;
+      this.dispatchEvent(new CustomEvent('blestate', { detail: { connected: true } }));
+    } catch (error) {
+      if (device?.gatt?.connected) device.gatt.disconnect();
+      if (device) device.removeEventListener('gattserverdisconnected', this._handleBluetoothDisconnect);
+      this.bluetoothDevice = null;
       this.bluetoothCharacteristic = null;
-      this.dispatchEvent(new CustomEvent('blestate', { detail: { connected: false } }));
-    });
-
-    const server = await this.bluetoothDevice.gatt.connect();
-    const service = await server.getPrimaryService(PetDockBridge.BLE_SERVICE);
-    const characteristic = await service.getCharacteristic(PetDockBridge.BLE_CHARACTERISTIC);
-    if (!this.getBleWriteMode(characteristic)) {
-      if (server.connected) server.disconnect();
-      throw new Error('Meem FFE1 특성이 BLE 쓰기를 지원하지 않습니다.');
+      throw error;
+    } finally {
+      this._bleConnecting = false;
     }
-    this.bluetoothCharacteristic = characteristic;
-    this.dispatchEvent(new CustomEvent('blestate', { detail: { connected: true } }));
+  }
+
+  _clearBluetoothState(reason = '') {
+    const device = this.bluetoothDevice;
+    if (!device && !this.bluetoothCharacteristic) return;
+    if (device) device.removeEventListener('gattserverdisconnected', this._handleBluetoothDisconnect);
+    this.bluetoothDevice = null;
+    this.bluetoothCharacteristic = null;
+    this._bleConnecting = false;
+    this.dispatchEvent(new CustomEvent('blestate', { detail: { connected: false, reason } }));
+  }
+
+  async disconnectBluetooth() {
+    const device = this.bluetoothDevice;
+    if (!device) return;
+    device.removeEventListener('gattserverdisconnected', this._handleBluetoothDisconnect);
+    try {
+      if (device.gatt?.connected) device.gatt.disconnect();
+    } finally {
+      this._clearBluetoothState();
+    }
   }
 
   getBleWriteMode(characteristic = this.bluetoothCharacteristic) {

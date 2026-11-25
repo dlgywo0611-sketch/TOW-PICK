@@ -277,7 +277,10 @@
                   <strong>Arduino 버튼</strong>
                   <p>9600 baud · BTN_A / BTN_B</p>
                 </div>
-                <button id="connect-usb" class="device-button" type="button">USB 연결</button>
+                <div class="device-actions">
+                  <button id="connect-usb" class="device-button" type="button">USB 연결</button>
+                  <button id="disconnect-usb" class="device-button disconnect hidden" type="button">연결 해제</button>
+                </div>
               </article>
 
               <article class="device-card">
@@ -286,8 +289,19 @@
                   <strong>Meem LED</strong>
                   <p>FFE0 서비스 · FFE1 특성</p>
                 </div>
-                <button id="connect-ble" class="device-button" type="button">블루투스 연결</button>
+                <div class="device-actions">
+                  <button id="connect-ble" class="device-button" type="button">블루투스 연결</button>
+                  <button id="disconnect-ble" class="device-button disconnect hidden" type="button">연결 해제</button>
+                </div>
               </article>
+            </div>
+
+            <div id="petdock-error" class="device-error hidden" role="alert">
+              <div>
+                <strong>장치 연결을 확인해 주세요.</strong>
+                <p id="petdock-error-message"></p>
+              </div>
+              <button id="dismiss-petdock-error" type="button" aria-label="장치 오류 안내 닫기">닫기</button>
             </div>
 
             <div class="petdock-console">
