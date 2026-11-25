@@ -167,6 +167,20 @@
                 <span id="decision-current-state" class="decision-status-tag">진행 중</span>
               </div>
 
+              <section id="decision-progress" class="decision-progress" aria-labelledby="decision-progress-title">
+                <div class="decision-progress-copy">
+                  <p class="eyebrow coral">LIVE STATUS</p>
+                  <h4 id="decision-progress-title">현재 진행 상태</h4>
+                  <p id="decision-progress-message" aria-live="polite">두 사람의 조건 제출 상태를 확인하고 있어요.</p>
+                </div>
+                <ol class="decision-progress-steps">
+                  <li data-decision-stage="conditions"><span>1</span><strong>조건 제출</strong><small>각자 비공개로</small></li>
+                  <li data-decision-stage="candidate"><span>2</span><strong>후보 선택</strong><small>추천 또는 직접 등록</small></li>
+                  <li data-decision-stage="approval"><span>3</span><strong>각자 승인</strong><small>최신 후보 기준</small></li>
+                  <li data-decision-stage="confirmed"><span>4</span><strong>최종 확정</strong><small>둘의 선택 완료</small></li>
+                </ol>
+              </section>
+
               <div class="decision-top-grid">
                 <form id="decision-condition-form" class="decision-card">
                   <h4>2. 나의 비공개 조건</h4>

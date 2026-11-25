@@ -20,6 +20,8 @@
     detailBody: $('#decision-detail-body'),
     selectedTitle: $('#decision-current-title'),
     selectedStatus: $('#decision-current-state'),
+    progress: $('#decision-progress'),
+    progressMessage: $('#decision-progress-message'),
     conditionForm: $('#decision-condition-form'),
     conditionButton: $('#decision-save-condition'),
     conditionCount: $('#decision-submit-count'),
@@ -136,6 +138,18 @@
     ui.openManual.disabled = flow.busy || !fallback.canUseManual;
   }
 
+  function renderProgress() {
+    const stage = logic.getDecisionStage(flow.detail, flow.status, state.user.id);
+    ui.progress.dataset.stage = stage.key;
+    ui.progressMessage.textContent = stage.message;
+    const items = ui.progress.querySelectorAll('[data-decision-stage]');
+    items.forEach((item, index) => {
+      item.classList.toggle('complete', index < stage.index || stage.key === 'confirmed');
+      item.classList.toggle('active', index === stage.index && stage.key !== 'confirmed');
+      item.setAttribute('aria-current', index === stage.index ? 'step' : 'false');
+    });
+  }
+
   function renderDetails() {
     const detail = flow.detail;
     ui.detailBody.classList.toggle('hidden', !flow.selectedId);
@@ -161,6 +175,7 @@
     renderMemberStatuses();
     renderApprovals();
     renderRecommendationNotice();
+    renderProgress();
     const allowRecommendation = logic.canRecommend(detail, flow.status, flow.attempted.has(flow.selectedId));
     ui.recommendButton.disabled = flow.busy || !allowRecommendation;
     ui.addOption.disabled = flow.busy || !allowRecommendation || ui.options.children.length >= 8;
