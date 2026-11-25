@@ -78,8 +78,24 @@
     }));
   }
 
+  function getRecommendationFallbackState(detail, statuses, attemptedLocally = false, errorMessage = '') {
+    const hasCandidate = Boolean(detail?.current_candidate);
+    const attempted = attemptedLocally || Boolean(errorMessage);
+    const canUseManual = Boolean(detail?.status === 'open' && conditionsReady(statuses));
+    if (hasCandidate || !attempted) {
+      return { visible: false, canUseManual, tone: 'info', title: '', message: '' };
+    }
+    return {
+      visible: true,
+      canUseManual,
+      tone: 'warning',
+      title: '자동 추천을 완료하지 못했어요.',
+      message: errorMessage || '추천 기회가 사용됐지만 적합한 후보가 없습니다. 수동 후보를 등록해 결정을 계속할 수 있어요.',
+    };
+  }
+
   const logic = { splitTags, makeOptions, canEditConditions, conditionsReady,
-    canRecommend, canApprove, getMemberStates };
+    canRecommend, canApprove, getMemberStates, getRecommendationFallbackState };
   if (typeof module !== 'undefined' && module.exports) module.exports = logic;
   root.TwoPickDecisionLogic = logic;
 }(typeof globalThis !== 'undefined' ? globalThis : this));
