@@ -13,6 +13,9 @@ for (const id of ['login-form', 'signup-form', 'join-form', 'create-couple-butto
 for (const endpoint of ['/token', '/users', '/couples', '/couples/join', '/couples/me']) {
   assert.ok(app.includes(`'${endpoint}'`), `missing account/couple endpoint: ${endpoint}`);
 }
+assert.ok(app.includes("'/couples/invite-code'"), 'missing invite code reissue endpoint');
+assert.match(app, /Invite code expired or inactive/);
+assert.match(html, /id="reissue-invite-button"/);
 for (const page of ['home', 'decision', 'history', 'schedule', 'pet', 'settings']) {
   assert.match(html, new RegExp(`data-service-page=["']${page}["']`), `missing service page: ${page}`);
 }

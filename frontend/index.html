@@ -152,6 +152,8 @@
             </div>
             <div class="connected-actions">
               <span id="connected-code" class="connected-code"></span>
+              <small id="connected-code-policy" class="invite-code-policy">초대 코드는 발급 후 24시간 동안 유효해요.</small>
+              <button id="reissue-invite-button" class="refresh-button" type="button">초대 코드 재발급</button>
               <button id="refresh-couple-button" class="refresh-button" type="button">연결 상태 새로고침</button>
               <a class="refresh-button profile-link" href="#settings">커플 프로필</a>
             </div>
@@ -520,7 +522,7 @@
             <div id="couple-profile-members" class="couple-profile-members" aria-live="polite"></div>
             <article class="couple-info-card">
               <div><span>커플 연결 코드</span><strong id="profile-invite-code">-</strong><small>새 상대방 연결이 필요한 경우에만 공유하세요.</small></div>
-              <button id="copy-profile-invite" class="decision-secondary" type="button">코드 복사</button>
+              <div class="couple-code-actions"><button id="copy-profile-invite" class="decision-secondary" type="button">코드 복사</button><button id="profile-reissue-invite" class="decision-secondary" type="button">코드 재발급</button></div>
             </article>
             <div class="profile-safety-note"><strong>개인 조건은 서로에게 공개되지 않아요.</strong><p>프로필 화면에는 연결 정보만 표시하며 예산, 시간, 선호·회피 조건은 표시하지 않습니다.</p></div>
             <div class="settings-grid">

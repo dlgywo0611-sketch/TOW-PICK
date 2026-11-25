@@ -23,6 +23,9 @@ const elements = {
   connectedTitle: document.querySelector('#connected-title'),
   connectedCode: document.querySelector('#connected-code'),
   refreshCoupleButton: document.querySelector('#refresh-couple-button'),
+  reissueInviteButton: document.querySelector('#reissue-invite-button'),
+  profileReissueInvite: document.querySelector('#profile-reissue-invite'),
+  connectedCodePolicy: document.querySelector('#connected-code-policy'),
   memberA: document.querySelector('#member-a'),
   memberB: document.querySelector('#member-b'),
   connectUsb: document.querySelector('#connect-usb'),
@@ -48,7 +51,8 @@ const requestUi = {
 const errorMessages = {
   'Incorrect email or password': '이메일 또는 비밀번호가 올바르지 않습니다.',
   'Email already registered': '이미 가입된 이메일입니다.',
-  'Invite code not found': '초대 코드를 찾을 수 없습니다.',
+  'Invite code not found': '초대 코드를 찾을 수 없습니다. 코드가 재발급되었는지 확인해 주세요.',
+  'Invite code expired or inactive': '초대 코드가 만료되었거나 사용할 수 없습니다. 초대한 사람에게 새 코드를 요청해 주세요.',
   'User already belongs to a couple': '이미 커플에 연결된 계정입니다.',
   'Couple already has two members': '이미 두 명이 연결된 커플입니다.',
   'User does not belong to a couple': '아직 커플에 연결되지 않았습니다.',
@@ -212,6 +216,11 @@ function render() {
     : '초대 코드를 상대방에게 전달해 주세요.';
   elements.connectedCode.textContent = state.couple.invite_code;
   elements.refreshCoupleButton.classList.toggle('hidden', connected);
+  elements.reissueInviteButton.classList.toggle('hidden', connected);
+  elements.reissueInviteButton.disabled = connected;
+  elements.profileReissueInvite.classList.toggle('hidden', connected);
+  elements.profileReissueInvite.disabled = connected;
+  elements.connectedCodePolicy.classList.toggle('hidden', connected);
   window.dispatchEvent(new Event('twopick:session-changed'));
 }
 
@@ -332,6 +341,28 @@ elements.refreshCoupleButton.addEventListener('click', async () => {
     setButtonBusy(elements.refreshCoupleButton, false, '');
   }
 });
+
+async function reissueInviteCode(button) {
+  hideAlert();
+  if (!state.couple || state.couple.members.length >= 2) {
+    showAlert('두 사람이 연결된 뒤에는 초대 코드를 재발급할 수 없습니다.');
+    return;
+  }
+  setButtonBusy(button, true, '재발급 중…');
+  try {
+    state.couple = await api('/couples/invite-code', { method: 'POST' });
+    sessionStorage.setItem(`tow_pick_invite_issued_${state.couple.id}`, new Date().toISOString());
+    render();
+    showAlert('새 초대 코드를 발급했습니다. 이전 코드는 사용할 수 없으며 새 코드는 24시간 동안 유효합니다.', true);
+  } catch (error) {
+    showAlert(error.message);
+  } finally {
+    setButtonBusy(button, false, '');
+  }
+}
+
+elements.reissueInviteButton.addEventListener('click', () => reissueInviteCode(elements.reissueInviteButton));
+elements.profileReissueInvite.addEventListener('click', () => reissueInviteCode(elements.profileReissueInvite));
 
 elements.logoutButton.addEventListener('click', async () => {
   hideAlert();
