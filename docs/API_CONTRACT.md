@@ -594,7 +594,7 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 |---|---|---|
 | 두 사용자 조건 기반 규칙형 추천 | implemented (P0 rules) | `POST /decisions/{decision_id}/recommendations` — 신규 후보 v1 생성, 가격·시간은 시연용 |
 | Candidate 자동 생성·추천 | partial | 사용자 입력 시연용 옵션의 규칙형 추천 v1 생성 가능. 자동 실매장 검색/가격 확인/AI 추천은 미구현 |
-| 별도 최종 결정 기록 | planned | 현재는 `Decision.status`와 current Candidate만 사용 |
+| 별도 최종 결정 기록 | implemented (신규 확정 건) | `GET /decision-confirmations`; 양측 승인 시 스냅샷 1건 저장. 과거 확정 건은 자동 이관하지 않음 |
 | 만족도·간단 피드백 | planned | endpoint/schema 없음 |
 | OUR PET 상태·성장 | planned | endpoint/schema 없음 |
 | 생일 월·일 기반 OUR PET 배정 | planned | 곰·토끼 배정 규칙만 확정, endpoint/schema 없음 |
@@ -640,3 +640,18 @@ HTTP 오류의 `detail` 문자열은 현재 프론트의 사용자 메시지 매
 - 응답은 추천 후보와 버전만 포함하며 상대방 조건·개인 점수·탈락 이유는 노출하지 않는다.
 - 상세 계약, 오류 코드, 가격 미검증 주의는 [`BALANCED_RECOMMENDATIONS.md`](BALANCED_RECOMMENDATIONS.md) 참조.
 - 실제 브라우저 UI, 실가격 검증, 동시 요청 원자성은 미구현/미검증 상태다.
+
+## 2026-11-25 추가 계약 — 확정 이력
+
+| Method | Path | Auth | Request | Success | 주요 Error |
+|---|---|---|---|---|---|
+| GET | `/decision-confirmations` | Bearer JWT | 없음 | 200 `DecisionConfirmationRead[]` | 401 인증 실패, 409 커플 미가입 |
+
+현재 커플의 확정 기록만 ID 내림차순으로 반환한다. 두 번째 사용자의 최신 Candidate 승인과 같은 DB 트랜잭션에서 기록을 만든다. 응답 예시는 다음과 같다.
+
+```json
+[{"id": 1, "decision_id": 100, "candidate_id": 501, "candidate_version": 2,
+  "content_snapshot": "초밥", "confirmed_at": "2026-11-25T09:00:00"}]
+```
+
+SQLite의 datetime 응답에 timezone offset이 보존된다고 가정하지 않는다. 기존에 기록 없이 확정된 Decision은 이 목록에 자동으로 나타나지 않으므로 기존 `/decisions` 및 `/decisions/{decision_id}` 조회를 계속 사용한다. 상대방의 비공개 조건은 이력 응답에 포함되지 않는다. 프론트엔드와 n8n 연동 주의사항은 [`BACKEND_INTEGRATION_20261125.md`](BACKEND_INTEGRATION_20261125.md)에 정리했다.
