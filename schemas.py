@@ -269,3 +269,29 @@ class NotificationSettingRead(NotificationSettingInput):
     consented_at: datetime | None = None
     withdrawn_at: datetime | None = None
     timezone: Literal["Asia/Seoul"] = "Asia/Seoul"
+
+
+class NotificationDispatchResultInput(BaseModel):
+    attempt: int = Field(ge=1)
+    result: Literal["simulated", "sent", "failed", "canceled"]
+    error_code: Literal[
+        "connection_error", "http_error", "timeout", "auth_error",
+        "delivery_failed", "result_unknown",
+    ] | None = None
+    provider_message_id: str | None = Field(default=None, min_length=1, max_length=255)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_error_code(self):
+        if (self.result == "failed") != (self.error_code is not None):
+            raise ValueError("error_code is required only for failed results")
+        if (self.result == "sent") != (self.provider_message_id is not None):
+            raise ValueError("provider_message_id is required only for sent results")
+        return self
+
+
+class NotificationClaimInput(BaseModel):
+    mode: Literal["mock", "test_email"] = "mock"
+
+    model_config = ConfigDict(extra="forbid")

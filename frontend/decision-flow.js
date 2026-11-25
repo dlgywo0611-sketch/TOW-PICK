@@ -35,6 +35,7 @@
     recommendationNoticeTitle: $('#decision-recommendation-notice-title'),
     recommendationNoticeMessage: $('#decision-recommendation-notice-message'),
     openManual: $('#decision-open-manual'),
+    startNew: $('#decision-start-new'),
     candidateText: $('#decision-candidate-text'),
     approvalCount: $('#decision-approval-count'),
     approvalMembers: $('#decision-approval-members'),
@@ -90,6 +91,7 @@
       button.addEventListener('click', () => selectDecision(decision.id));
       ui.list.append(button);
     }
+    window.dispatchEvent(new CustomEvent('twopick:decisions-changed', { detail: { decisions: flow.list.slice() } }));
   }
 
   function renderMemberStatuses() {
@@ -159,7 +161,8 @@
     ui.selectedStatus.textContent = detail?.confirmed ? '최종 확정' : '진행 중';
     ui.selectedStatus.classList.toggle('confirmed', Boolean(detail?.confirmed));
 
-    const editable = logic.canEditConditions(detail);
+    const recommendationAttempted = Boolean(detail.recommendation_attempted) || flow.attempted.has(flow.selectedId);
+    const editable = logic.canEditConditions(detail, recommendationAttempted);
     for (const control of ui.conditionForm.querySelectorAll('input, textarea, button')) {
       control.disabled = flow.busy || !editable;
     }
@@ -171,7 +174,7 @@
       ui.conditionForm.reset();
     }
     ui.conditionButton.textContent = editable ? (flow.ownConditions ? '내 조건 수정·저장하기' : '내 조건 저장하기') :
-      '후보 생성 후 조건 수정 불가';
+      recommendationAttempted && !detail?.current_candidate ? '추천 시도 후 조건 수정 불가' : '후보 생성 후 조건 수정 불가';
     renderMemberStatuses();
     renderApprovals();
     renderRecommendationNotice();
@@ -389,6 +392,11 @@
   ui.openManual.addEventListener('click', () => {
     ui.manualForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
     ui.manualInput.focus({ preventScroll: true });
+  });
+  ui.startNew.addEventListener('click', () => {
+    ui.createForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    ui.createForm.querySelector('input[name="title"]').focus({ preventScroll: true });
+    showAlert('새로운 공동결정은 새로운 조건과 1회의 추천 기회를 사용합니다.');
   });
   ui.manualForm.addEventListener('click', (event) => {
     const template = event.target.closest('[data-manual-template]');

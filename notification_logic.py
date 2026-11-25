@@ -51,35 +51,43 @@ def plan_next_jobs(db: Session, schedule: models.CoupleSchedule,
             if (kind == "day_of" and schedule.local_time is not None
                     and setting.send_time > schedule.local_time):
                 continue
-            # At most the next occurrence is planned. A future dispatcher must
-            # advance recurring jobs after successful delivery.
+            # Keep one future occurrence per kind. Completed mock or sent
+            # occurrences are skipped when planning the next repeat.
             target = local_today + timedelta(days=offset)
-            occurrence = occurrence_on_or_after(schedule.local_date,
-                                               schedule.repeat_rule, target)
-            if occurrence is None:
-                continue
-            local_send = datetime.combine(occurrence - timedelta(days=offset),
-                                          setting.send_time, tzinfo=KST)
-            send_at = local_send.astimezone(timezone.utc).replace(tzinfo=None)
-            if send_at <= now.astimezone(timezone.utc).replace(tzinfo=None):
-                continue
-            raw_key = (f"{schedule.id}:{schedule.revision}:{user.id}:"
-                       f"{kind}:{occurrence.isoformat()}")
-            key = hashlib.sha256(raw_key.encode()).hexdigest()
-            existing = db.scalar(select(models.NotificationJob).where(
-                models.NotificationJob.dedupe_key == key,
-            ))
-            if existing is not None:
-                if existing.status == "canceled":
-                    existing.status = "pending"
-                    existing.send_at = send_at
-                continue
-            db.add(models.NotificationJob(
-                schedule_id=schedule.id, schedule_revision=schedule.revision,
-                recipient_user_id=user.id, notification_type=kind,
-                occurrence_date=occurrence, send_at=send_at,
-                dedupe_key=key, status="pending", attempt_count=0,
-            ))
+            while True:
+                occurrence = occurrence_on_or_after(schedule.local_date,
+                                                   schedule.repeat_rule, target)
+                if occurrence is None:
+                    break
+                local_send = datetime.combine(occurrence - timedelta(days=offset),
+                                              setting.send_time, tzinfo=KST)
+                send_at = local_send.astimezone(timezone.utc).replace(tzinfo=None)
+                raw_key = (f"{schedule.id}:{schedule.revision}:{user.id}:"
+                           f"{kind}:{occurrence.isoformat()}")
+                key = hashlib.sha256(raw_key.encode()).hexdigest()
+                existing = db.scalar(select(models.NotificationJob).where(
+                    models.NotificationJob.dedupe_key == key,
+                ))
+                if existing is not None and existing.status in ("simulated", "sent", "expired"):
+                    if schedule.repeat_rule == "none":
+                        break
+                    target = occurrence + timedelta(days=1)
+                    continue
+                if existing is not None:
+                    if (existing.status == "canceled"
+                            and send_at > now.astimezone(timezone.utc).replace(tzinfo=None)):
+                        existing.status = "pending"
+                        existing.send_at = send_at
+                    break
+                if send_at <= now.astimezone(timezone.utc).replace(tzinfo=None):
+                    break
+                db.add(models.NotificationJob(
+                    schedule_id=schedule.id, schedule_revision=schedule.revision,
+                    recipient_user_id=user.id, notification_type=kind,
+                    occurrence_date=occurrence, send_at=send_at,
+                    dedupe_key=key, status="pending", attempt_count=0,
+                ))
+                break
     db.flush()
 
 

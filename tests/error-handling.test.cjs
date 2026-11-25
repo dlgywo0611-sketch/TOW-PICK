@@ -1,0 +1,15 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const context = { globalThis: {} };
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'frontend', 'error-handling-logic.js'), 'utf8'), context);
+const logic = context.globalThis.TwoPickErrorHandlingLogic;
+assert.equal(logic.normalizeApiDetail('known', { known: '친절한 안내' }), '친절한 안내');
+assert.equal(logic.normalizeApiDetail([{ loc: ['body', 'email'] }]), 'email 입력값을 확인해 주세요.');
+assert.match(logic.normalizeApiDetail(null), /잠시 후/);
+assert.match(logic.friendlyFetchError({ name: 'AbortError' }), /응답 시간/);
+assert.match(logic.friendlyFetchError(new Error('network')), /서버에 연결/);
+assert.equal(logic.isMutation('POST'), true);
+assert.equal(logic.isMutation('GET'), false);
+console.log('PASS: API errors, timeout messages and duplicate mutation classification');

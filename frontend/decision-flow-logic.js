@@ -47,8 +47,8 @@
     });
   }
 
-  function canEditConditions(detail) {
-    return Boolean(detail && detail.status === 'open' && !detail.current_candidate);
+  function canEditConditions(detail, attemptedLocally = false) {
+    return Boolean(detail && detail.status === 'open' && !detail.current_candidate && !detail.recommendation_attempted && !attemptedLocally);
   }
 
   function conditionsReady(status) {
@@ -57,7 +57,7 @@
   }
 
   function canRecommend(detail, status, attemptedLocally = false) {
-    return canEditConditions(detail) && conditionsReady(status) && !attemptedLocally;
+    return canEditConditions(detail, attemptedLocally) && conditionsReady(status);
   }
 
   function canApprove(detail, userId) {
@@ -80,7 +80,7 @@
 
   function getRecommendationFallbackState(detail, statuses, attemptedLocally = false, errorMessage = '') {
     const hasCandidate = Boolean(detail?.current_candidate);
-    const attempted = attemptedLocally || Boolean(errorMessage);
+    const attempted = Boolean(detail?.recommendation_attempted) || attemptedLocally || Boolean(errorMessage);
     const canUseManual = Boolean(detail?.status === 'open' && conditionsReady(statuses));
     if (hasCandidate || !attempted) {
       return { visible: false, canUseManual, tone: 'info', title: '', message: '' };
@@ -90,7 +90,7 @@
       canUseManual,
       tone: 'warning',
       title: '자동 추천을 완료하지 못했어요.',
-      message: errorMessage || '추천 기회가 사용됐지만 적합한 후보가 없습니다. 수동 후보를 등록해 결정을 계속할 수 있어요.',
+      message: errorMessage ? `${errorMessage} 조건 수정과 재추천은 불가능합니다. 수동 후보를 등록하거나 새로운 공동결정을 시작해 주세요.` : '추천 기회가 사용됐지만 적합한 후보가 없습니다. 조건 수정과 재추천은 불가능하며, 수동 후보를 등록하거나 새로운 공동결정을 시작할 수 있어요.',
     };
   }
 

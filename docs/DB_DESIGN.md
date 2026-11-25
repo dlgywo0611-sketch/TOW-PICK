@@ -224,7 +224,9 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 
 `DecisionFeedback`은 `(decision_id, user_id)` unique, `score` 1~5, 선택 `comment` 최대 500자와 생성·수정 시각을 저장한다. 서버가 JWT 사용자와 결정의 `couple_id`를 검증하고 개인 GET/PUT만 제공한다. 점수 범위와 글자 길이는 API schema에서 검증하며 기존 SQLite 테이블에 DB CHECK를 추가하지 않는다.
 
-`NotificationSetting`은 `user_id` PK/FK, 기본 미동의, D-1/당일 선택, 한국 현지 발송 시각, 정책 버전, 동의·철회 시각을 가진다. 설정 행이 없어도 GET은 미동의 기본값을 반환한다. `NotificationJob`은 일정 ID/FK, revision, 수신 사용자 ID/FK, 알림 종류, 발생 날짜, UTC 예정 시각, SHA-256 dedupe key unique, 상태·시도 횟수·성공·실패 시각을 저장한다. 동일 key는 중복 삽입하지 않는다. 일정 삭제는 원장을 보존하기 위해 soft delete하고 미발송 작업을 취소한다. 현재는 `pending`/`canceled` 예약 기반만 사용하며 발송·실패 재시도 worker는 없다.
+`NotificationSetting`은 `user_id` PK/FK, 기본 미동의, D-1/당일 선택, 한국 현지 발송 시각, 정책 버전, 동의·철회 시각을 가진다. 설정 행이 없어도 GET은 미동의 기본값을 반환한다. `NotificationJob`은 일정 ID/FK, revision, 수신 사용자 ID/FK, 알림 종류, 발생 날짜, UTC 예정 시각, SHA-256 dedupe key unique, 상태·시도 횟수·성공·실패 시각을 저장한다. 동일 key는 중복 삽입하지 않는다. 일정 삭제는 원장을 보존하기 위해 soft delete하고 미발송 작업을 취소한다. 내부 가상 연동과 승인된 테스트 메일 경로에서는 `pending`/`claimed`/`simulated`/`sent`/`canceled`/`expired`/`failed`/`unknown` 상태를 사용한다. `sent`는 승인된 테스트 메일의 Gmail 접수 ID가 확인된 두 건에서만 검증했다.
+
+`NotificationDispatchAttempt`는 이번 단계에서 추가한 시도 원장이다. `id` PK, `job_id` FK, `number`, `mode`(`mock`/`test_email`), `status`, `claimed_at`, `completed_at`, `retry_after`, `error_code`, `provider_message_id`를 저장하며 `UNIQUE(job_id, number)`로 같은 시도 번호의 중복 행을 막는다. 수신 이메일·일정 제목·비공개 조건·인증 키는 저장하지 않는다. SQLite `BEGIN IMMEDIATE` 아래에서 Job의 `pending → claimed`와 시도 원장 삽입을 한 트랜잭션으로 커밋한다. 중단 후 결과가 불분명하면 `unknown`으로 보존하고 자동 재선점하지 않는다. 가상 완료는 `simulated`이며 `succeeded_at`을 채우지 않는다. 승인된 실메일 시험의 Gmail 접수 ID가 확인된 경우에만 `sent`와 `succeeded_at`을 기록한다. 기존 Job 행을 삭제·초기화하지 않고 새 테이블만 추가하며, 이전 단계의 시도 원장에 `mode`/`provider_message_id`가 없으면 행을 보존하는 컬럼 추가를 적용한다. 운영용 발송·복구 원장은 후속 설계·검증이 필요하다.
 
 ## 우선 보강 순서
 

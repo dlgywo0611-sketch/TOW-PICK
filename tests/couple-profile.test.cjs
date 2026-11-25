@@ -1,0 +1,15 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const context = { globalThis: {} };
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'frontend', 'couple-profile-logic.js'), 'utf8'), context);
+const logic = context.globalThis.TwoPickCoupleProfileLogic;
+assert.equal(logic.maskEmail('hello@example.com'), 'he***@example.com');
+assert.equal(logic.maskEmail('a@example.com'), 'a**@example.com');
+assert.equal(logic.maskEmail('invalid'), '');
+const profiles = logic.buildMemberProfiles({ members: [{ id: 1, nickname: '성빈', email: 'a@x.com' }, { id: 2, nickname: '주연', email: 'b@x.com' }] }, 1);
+assert.equal(profiles.length, 2);
+assert.equal(profiles[0].isMe, true);
+assert.equal(profiles[1].isMe, false);
+console.log('PASS: couple profile masking and member roles');

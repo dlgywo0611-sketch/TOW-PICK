@@ -1,0 +1,391 @@
+{
+  "name": "TWO PICK - 03 CARE Notification Dispatch",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "829bdedd-2d7e-5d93-9564-02303a1c4907",
+      "name": "1분 주기 확인"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8001/internal/notifications/due",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        230,
+        0
+      ],
+      "id": "83496896-8ea5-57ee-8145-f43016ab8e60",
+      "name": "발송 예정 작업 조회"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ids = $input.first().json.job_ids;\nif (!Array.isArray(ids)) throw new Error('Invalid due response');\nreturn ids.map(id => ({json: {job_id: id}}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "id": "cb12b52f-e02b-5e04-a5ff-8487b753d3e7",
+      "name": "작업 ID 분리"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8001/internal/notifications/' + $json.job_id + '/claim' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        0
+      ],
+      "id": "bfc4fd01-d24c-5828-850d-49bcaf4a39aa",
+      "name": "발송 작업 선점"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8001/internal/notifications/' + $json.job_id + '/verify' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        0
+      ],
+      "id": "a7e612a7-7972-52af-a8ea-09102be130e0",
+      "name": "발송 직전 조건 확인"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "3d532bfc-d865-52e4-9d43-ffb81453b4dd",
+              "leftValue": "={{ $json.eligible }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1150,
+        0
+      ],
+      "id": "28dd991d-322e-5fd0-a945-0ff69644e6e6",
+      "name": "발송 가능 여부"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({json: {\n  job_id: item.json.job_id, attempt: item.json.attempt,\n  notification_type: item.json.notification_type,\n  message: item.json.notification_type === 'd1'\n    ? '내일은 함께 등록한 일정이 있습니다.'\n    : '오늘은 함께 등록한 일정이 있습니다.',\n  result: 'simulated', actual_email_sent: false\n}}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        -120
+      ],
+      "id": "c11a4601-7d70-5eb3-9974-d386aaef80ed",
+      "name": "테스트 알림 구성"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({json: {\n  job_id: item.json.job_id, attempt: item.json.attempt,\n  result: 'canceled', actual_email_sent: false\n}}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        120
+      ],
+      "id": "8b386c67-6c09-56cc-8cc4-9c4abf6e27ae",
+      "name": "차단 작업 정리"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8001/internal/notifications/' + $json.job_id + '/result' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({attempt: $json.attempt, result: $json.result}) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1610,
+        -120
+      ],
+      "id": "d1d1598f-6695-5daf-a75d-783ea88aab28",
+      "name": "가상 발송 결과 기록"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8001/internal/notifications/' + $json.job_id + '/result' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({attempt: $json.attempt, result: $json.result}) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1610,
+        120
+      ],
+      "id": "af807991-12d3-59ab-9986-bbac0db97a78",
+      "name": "차단 결과 기록"
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1840,
+        0
+      ],
+      "id": "a5bf865c-b7e6-5625-9cf8-ac7ce617a871",
+      "name": "처리 결과 병합"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(item => item.json);\nreturn [{json: {mode: 'mock', total: rows.length,\n  simulated: rows.filter(r => r.status === 'simulated').length,\n  blocked: rows.filter(r => r.status === 'canceled').length,\n  actual_emails_sent: 0,\n  job_ids: rows.map(r => r.job_id),\n  completed_at: new Date().toISOString()\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2070,
+        0
+      ],
+      "id": "73da9cc0-39fc-5daa-9317-a782af976bf3",
+      "name": "실행 결과 집계"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1분 주기 확인": {
+      "main": [
+        [
+          {
+            "node": "발송 예정 작업 조회",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "발송 예정 작업 조회": {
+      "main": [
+        [
+          {
+            "node": "작업 ID 분리",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "작업 ID 분리": {
+      "main": [
+        [
+          {
+            "node": "발송 작업 선점",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "발송 작업 선점": {
+      "main": [
+        [
+          {
+            "node": "발송 직전 조건 확인",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "발송 직전 조건 확인": {
+      "main": [
+        [
+          {
+            "node": "발송 가능 여부",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "발송 가능 여부": {
+      "main": [
+        [
+          {
+            "node": "테스트 알림 구성",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "차단 작업 정리",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "테스트 알림 구성": {
+      "main": [
+        [
+          {
+            "node": "가상 발송 결과 기록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "차단 작업 정리": {
+      "main": [
+        [
+          {
+            "node": "차단 결과 기록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "가상 발송 결과 기록": {
+      "main": [
+        [
+          {
+            "node": "처리 결과 병합",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "차단 결과 기록": {
+      "main": [
+        [
+          {
+            "node": "처리 결과 병합",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "처리 결과 병합": {
+      "main": [
+        [
+          {
+            "node": "실행 결과 집계",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "tags": []
+}
