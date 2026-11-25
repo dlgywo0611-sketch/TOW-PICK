@@ -11,6 +11,8 @@
     <script src="/static/app.js" defer></script>
     <script src="/static/decision-flow-logic.js" defer></script>
     <script src="/static/decision-flow.js" defer></script>
+    <script src="/static/mock-features-logic.js" defer></script>
+    <script src="/static/mock-features.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">본문으로 바로가기</a>
@@ -257,6 +259,46 @@
                   <p class="decision-help">새 버전의 후보로 변경하면 이전 후보에 대한 승인은 새 후보로 승계되지 않습니다.</p>
                 </form>
               </div>
+            </div>
+          </section>
+
+          <section class="memories-panel" aria-labelledby="history-title">
+            <header class="memories-heading">
+              <div>
+                <p class="eyebrow coral">DECISION ARCHIVE</p>
+                <h3 id="history-title">함께 고른 순간들</h3>
+                <p>완료된 공동결정을 돌아보고 서로의 만족도를 남겨보세요.</p>
+              </div>
+              <span class="mock-badge">테스트 데이터</span>
+            </header>
+
+            <div class="history-toolbar">
+              <label for="history-filter">기록 분류</label>
+              <select id="history-filter">
+                <option value="all">전체</option>
+                <option value="meal">식사</option>
+                <option value="date">데이트</option>
+                <option value="home">집에서</option>
+              </select>
+            </div>
+
+            <div class="history-layout">
+              <div id="history-list" class="history-list" aria-label="공동결정 기록 목록"></div>
+              <article id="history-detail" class="history-detail" aria-live="polite">
+                <p class="eyebrow">SELECTED MEMORY</p>
+                <h4 id="history-detail-title"></h4>
+                <p id="history-detail-meta" class="history-meta"></p>
+                <div class="history-result">
+                  <span>최종 선택</span>
+                  <strong id="history-detail-result"></strong>
+                </div>
+                <p id="history-detail-summary" class="history-summary"></p>
+                <fieldset class="satisfaction-fieldset">
+                  <legend>이 결정은 얼마나 만족스러웠나요?</legend>
+                  <div id="satisfaction-buttons" class="satisfaction-buttons" aria-label="만족도 1점부터 5점"></div>
+                  <p id="satisfaction-status" class="history-meta" aria-live="polite"></p>
+                </fieldset>
+              </article>
             </div>
           </section>
 
