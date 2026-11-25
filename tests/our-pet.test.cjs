@@ -1,0 +1,13 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const context = { globalThis: {} };
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'frontend', 'our-pet-logic.js'), 'utf8'), context);
+const logic = context.globalThis.TwoPickOurPetLogic;
+assert.deepEqual({ ...logic.growthState(65, 100) }, { experience: 65, maximum: 100, percent: 65, remaining: 35 });
+assert.equal(logic.growthState(150, 100).percent, 100);
+assert.equal(logic.growthState(-4, 100).experience, 0);
+assert.equal(logic.deviceSummary({ usb: true, ble: true }).connected, true);
+assert.match(logic.deviceSummary({ usb: false, ble: false }).label, /기다리고/);
+console.log('PASS: OUR PET growth and PET DOCK connection summaries');

@@ -23,6 +23,9 @@ const elements = {
   connectedTitle: document.querySelector('#connected-title'),
   connectedCode: document.querySelector('#connected-code'),
   refreshCoupleButton: document.querySelector('#refresh-couple-button'),
+  reissueInviteButton: document.querySelector('#reissue-invite-button'),
+  profileReissueInvite: document.querySelector('#profile-reissue-invite'),
+  connectedCodePolicy: document.querySelector('#connected-code-policy'),
   memberA: document.querySelector('#member-a'),
   memberB: document.querySelector('#member-b'),
   connectUsb: document.querySelector('#connect-usb'),
@@ -34,16 +37,31 @@ const elements = {
   petdockErrorMessage: document.querySelector('#petdock-error-message'),
   dismissPetdockError: document.querySelector('#dismiss-petdock-error'),
   petEvent: document.querySelector('#pet-event'),
+  petEventMeta: document.querySelector('#pet-event-meta'),
+  bleNotifyStatus: document.querySelector('#ble-notify-status'),
   ledControls: document.querySelector('#led-controls'),
 };
 
 const petDock = new PetDockBridge();
-const deviceState = { usb: false, ble: false };
+const deviceState = {
+  usb: false,
+  ble: false,
+  bleNotifySupported: null,
+  bleNotifyActive: false,
+};
+const sessionScope = globalThis.TwoPickSessionScopeLogic.createSessionScope();
+const isStaleSessionError = (error) => error?.staleSession === true;
+const requestState = { pending: 0, mutations: new Set() };
+const requestUi = {
+  loading: document.querySelector('#global-loading'),
+  offline: document.querySelector('#offline-banner'),
+};
 
 const errorMessages = {
   'Incorrect email or password': '이메일 또는 비밀번호가 올바르지 않습니다.',
   'Email already registered': '이미 가입된 이메일입니다.',
-  'Invite code not found': '초대 코드를 찾을 수 없습니다.',
+  'Invite code not found': '초대 코드를 찾을 수 없습니다. 코드가 재발급되었는지 확인해 주세요.',
+  'Invite code expired or inactive': '초대 코드가 만료되었거나 사용할 수 없습니다. 초대한 사람에게 새 코드를 요청해 주세요.',
   'User already belongs to a couple': '이미 커플에 연결된 계정입니다.',
   'Couple already has two members': '이미 두 명이 연결된 커플입니다.',
   'User does not belong to a couple': '아직 커플에 연결되지 않았습니다.',
@@ -51,17 +69,28 @@ const errorMessages = {
   'Token has been revoked': '로그아웃된 세션입니다. 다시 로그인해 주세요.',
   'Conditions not found': '아직 내 조건을 제출하지 않았어요.',
   'Conditions cannot be changed after candidate creation': '후보가 생성된 뒤에는 개인 조건을 수정할 수 없어요.',
+  'Conditions cannot be changed after recommendation attempt': '추천 시도 후에는 조건을 수정할 수 없습니다. 수동 후보를 등록하거나 새 공동결정을 시작해 주세요.',
   'Both couple members must submit conditions before recommendation': '두 사람이 모두 조건을 제출해야 추천할 수 있어요.',
   'Both couple members must submit conditions before candidate creation': '두 사람이 모두 조건을 제출해야 후보를 만들 수 있어요.',
   'Recommendation already attempted for this decision': '이 결정의 추천 기회는 이미 사용했어요. 수동 후보를 등록할 수 있어요.',
   'No mutually suitable option; try a manual candidate': '두 사람이 함께 수용할 추천 후보가 없어요. 추천 기회는 소진됐고 수동 후보를 등록할 수 있어요.',
   'Recommendation only available before first candidate': '추천은 첫 후보를 만들기 전에 한 번만 사용할 수 있어요.',
   'Decision is already closed': '이미 확정된 결정이에요.',
+  'Decision is not confirmed': '확정된 결정에서만 만족도를 남길 수 있어요.',
+  'Feedback not found': '아직 작성한 만족도 평가가 없습니다.',
   'User already approved this candidate': '이미 승인한 후보예요.',
   'Only the current candidate can be approved': '최신 후보만 승인할 수 있어요.',
+  'Decision not found': '공동결정을 찾을 수 없습니다.',
+  'You cannot access this decision': '이 공동결정에 접근할 권한이 없습니다.',
+  'Schedule not found': '일정을 찾을 수 없습니다.',
+  'You cannot access this schedule': '이 일정에 접근할 권한이 없습니다.',
+  'Concurrent update; retry the request': '다른 요청과 동시에 처리되었습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.',
+  'Couple join conflicted with another update': '동시에 커플 연결이 처리되었습니다. 연결 상태를 새로고침해 주세요.',
+  'Recommendation request conflicted with another update': '동시에 추천 요청이 처리되었습니다. 결정 상태를 새로고침해 주세요.',
 };
 
 function showAlert(message, success = false) {
+  if (!message) return;
   elements.alert.textContent = message;
   elements.alert.classList.remove('hidden', 'success');
   if (success) elements.alert.classList.add('success');
@@ -82,9 +111,19 @@ function renderDeviceState() {
   elements.connectBle.textContent = deviceState.ble ? '블루투스 연결됨' : '블루투스 연결';
   elements.connectBle.disabled = deviceState.ble;
   elements.disconnectBle.classList.toggle('hidden', !deviceState.ble);
+  if (!deviceState.ble) {
+    elements.bleNotifyStatus.textContent = 'FFE1 LED 제어 · 버튼 Notify 연결 대기';
+  } else if (deviceState.bleNotifyActive) {
+    elements.bleNotifyStatus.textContent = 'FFE1 LED 제어 · 버튼 Notify 수신 중';
+  } else if (deviceState.bleNotifySupported === false) {
+    elements.bleNotifyStatus.textContent = 'FFE1 Notify 미지원 · LED 제어만 사용';
+  } else {
+    elements.bleNotifyStatus.textContent = 'FFE1 Notify 시작 실패 · LED 제어만 사용';
+  }
   elements.ledControls.querySelectorAll('button').forEach((button) => {
     button.disabled = !deviceState.ble;
   });
+  window.dispatchEvent(new CustomEvent('twopick:pet-state', { detail: { ...deviceState } }));
 }
 
 function showDeviceError(message) {
@@ -105,29 +144,76 @@ function setButtonBusy(button, busy, label) {
 }
 
 async function api(path, options = {}) {
+  const sessionSnapshot = sessionScope.snapshot();
+  const logic = globalThis.TwoPickErrorHandlingLogic;
+  const method = String(options.method || 'GET').toUpperCase();
+  const mutationKey = `${sessionSnapshot}:${method}:${path}`;
+  if (logic.isMutation(method) && requestState.mutations.has(mutationKey)) {
+    throw new Error('이미 처리 중인 요청이에요. 잠시만 기다려 주세요.');
+  }
   const headers = new Headers(options.headers || {});
   if (state.token) headers.set('Authorization', `Bearer ${state.token}`);
   if (options.body && !(options.body instanceof URLSearchParams)) {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(path, { ...options, headers });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    const detail = payload.detail || '요청을 처리하지 못했습니다.';
-    const message = Array.isArray(detail) ? '입력값을 확인해 주세요.' :
-      (errorMessages[detail] || String(detail));
-    throw new Error(message);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  requestState.pending += 1;
+  if (logic.isMutation(method)) requestState.mutations.add(mutationKey);
+  requestUi.loading.classList.remove('hidden');
+  document.body.setAttribute('aria-busy', 'true');
+  try {
+    const response = await fetch(path, { ...options, headers, signal: options.signal || controller.signal });
+    if (!sessionScope.isCurrent(sessionSnapshot)) throw globalThis.TwoPickSessionScopeLogic.staleSessionError();
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      if (!sessionScope.isCurrent(sessionSnapshot)) throw globalThis.TwoPickSessionScopeLogic.staleSessionError();
+      const message = logic.normalizeApiDetail(payload.detail, errorMessages);
+      if (response.status === 401 && state.token && path !== '/token') {
+        clearSession();
+        render();
+        throw new Error('로그인이 만료되었습니다. 다시 로그인해 주세요.');
+      }
+      const requestError = new Error(message);
+      requestError.status = response.status;
+      requestError.detail = payload.detail;
+      throw requestError;
+    }
+    if (response.status === 204) return null;
+    const payload = await response.json();
+    if (!sessionScope.isCurrent(sessionSnapshot)) throw globalThis.TwoPickSessionScopeLogic.staleSessionError();
+    return payload;
+  } catch (error) {
+    if (isStaleSessionError(error)) throw error;
+    if (error instanceof TypeError || error?.name === 'AbortError') throw new Error(logic.friendlyFetchError(error));
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    requestState.pending = Math.max(0, requestState.pending - 1);
+    requestState.mutations.delete(mutationKey);
+    if (!requestState.pending) {
+      requestUi.loading.classList.add('hidden');
+      document.body.removeAttribute('aria-busy');
+    }
   }
-  return response.status === 204 ? null : response.json();
 }
 
+function renderNetworkState() {
+  requestUi.offline.classList.toggle('hidden', navigator.onLine);
+}
+window.addEventListener('online', renderNetworkState);
+window.addEventListener('offline', renderNetworkState);
+renderNetworkState();
+
 function saveToken(token) {
+  sessionScope.invalidate();
   state.token = token;
   sessionStorage.setItem('tow_pick_token', token);
 }
 
 function clearSession() {
+  sessionScope.invalidate();
   state.token = null;
   state.user = null;
   state.couple = null;
@@ -144,6 +230,13 @@ function render() {
   document.querySelector('.step:first-child').classList.toggle('active', !authenticated);
 
   if (!authenticated) {
+    elements.profileName.textContent = '사용자';
+    elements.profileAvatar.textContent = '?';
+    elements.logoutButton.removeAttribute('aria-label');
+    elements.connectionActions.classList.remove('hidden');
+    elements.connectedCard.classList.add('hidden');
+    elements.coupleStatus.classList.remove('online');
+    elements.coupleStatus.innerHTML = '<i></i> 연결 전';
     window.dispatchEvent(new Event('twopick:session-changed'));
     return;
   }
@@ -171,6 +264,11 @@ function render() {
     : '초대 코드를 상대방에게 전달해 주세요.';
   elements.connectedCode.textContent = state.couple.invite_code;
   elements.refreshCoupleButton.classList.toggle('hidden', connected);
+  elements.reissueInviteButton.classList.toggle('hidden', connected);
+  elements.reissueInviteButton.disabled = connected;
+  elements.profileReissueInvite.classList.toggle('hidden', connected);
+  elements.profileReissueInvite.disabled = connected;
+  elements.connectedCodePolicy.classList.toggle('hidden', connected);
   window.dispatchEvent(new Event('twopick:session-changed'));
 }
 
@@ -188,6 +286,7 @@ async function loadCurrentSession() {
       if (error.message !== errorMessages['User does not belong to a couple']) throw error;
     }
   } catch (error) {
+    if (isStaleSessionError(error)) return false;
     clearSession();
     showAlert(error.message);
     render();
@@ -227,6 +326,7 @@ elements.signupForm.addEventListener('submit', async (event) => {
       method: 'POST',
       body: JSON.stringify({ email: formData.get('email'), nickname: formData.get('nickname'), password: formData.get('password') }),
     });
+    localStorage.setItem('tow_pick_onboarding_pending', String(formData.get('email')).trim().toLowerCase());
     elements.loginForm.email.value = formData.get('email');
     elements.loginForm.password.focus();
     showAlert('계정을 만들었습니다. 왼쪽에서 로그인해 주세요.', true);
@@ -291,6 +391,28 @@ elements.refreshCoupleButton.addEventListener('click', async () => {
   }
 });
 
+async function reissueInviteCode(button) {
+  hideAlert();
+  if (!state.couple || state.couple.members.length >= 2) {
+    showAlert('두 사람이 연결된 뒤에는 초대 코드를 재발급할 수 없습니다.');
+    return;
+  }
+  setButtonBusy(button, true, '재발급 중…');
+  try {
+    state.couple = await api('/couples/invite-code', { method: 'POST' });
+    sessionStorage.setItem(`tow_pick_invite_issued_${state.couple.id}`, new Date().toISOString());
+    render();
+    showAlert('새 초대 코드를 발급했습니다. 이전 코드는 사용할 수 없으며 새 코드는 24시간 동안 유효합니다.', true);
+  } catch (error) {
+    showAlert(error.message);
+  } finally {
+    setButtonBusy(button, false, '');
+  }
+}
+
+elements.reissueInviteButton.addEventListener('click', () => reissueInviteCode(elements.reissueInviteButton));
+elements.profileReissueInvite.addEventListener('click', () => reissueInviteCode(elements.profileReissueInvite));
+
 elements.logoutButton.addEventListener('click', async () => {
   hideAlert();
   try {
@@ -338,8 +460,14 @@ elements.connectBle.addEventListener('click', async () => {
   hideDeviceError();
   setButtonBusy(elements.connectBle, true, '검색 중…');
   try {
-    await petDock.connectBluetooth();
-    showAlert('Meem 블루투스가 연결되었습니다.', true);
+    const result = await petDock.connectBluetooth();
+    if (result.notifyActive) {
+      showAlert('Meem 블루투스와 버튼 Notify가 연결되었습니다.', true);
+    } else if (!result.notifySupported) {
+      showAlert('Meem이 연결되었습니다. FFE1 Notify 미지원으로 LED 제어만 사용합니다.', true);
+    } else {
+      showAlert(`Meem이 연결되었습니다. Notify 시작 실패로 LED 제어만 사용합니다. (${result.notifyError})`);
+    }
   } catch (error) {
     showAlert(error.message);
     showDeviceError(error.message);
@@ -382,6 +510,8 @@ petDock.addEventListener('usbstate', (event) => {
 
 petDock.addEventListener('blestate', (event) => {
   deviceState.ble = event.detail.connected;
+  deviceState.bleNotifySupported = event.detail.notifySupported;
+  deviceState.bleNotifyActive = event.detail.notifyActive;
   renderDeviceState();
   if (!event.detail.connected && event.detail.reason) showDeviceError(event.detail.reason);
 });
@@ -390,6 +520,8 @@ petDock.addEventListener('button', (event) => {
   elements.petEvent.textContent = event.detail.button === 'A'
     ? '펫 반응 요청 (버튼 A)'
     : '펫 상태 확인 (버튼 B)';
+  elements.petEventMeta.textContent = `입력 출처 ${event.detail.source} · 누적 ${event.detail.count}회 `
+    + `(A ${event.detail.counts.A} / B ${event.detail.counts.B})`;
 });
 
 petDock.addEventListener('led', (event) => {

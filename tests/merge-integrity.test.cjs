@@ -7,10 +7,11 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const html = read('frontend/index.html');
 const app = read('frontend/app.js');
 const decisions = read('frontend/decision-flow.js');
-const mocks = read('frontend/mock-features.js');
+const history = read('frontend/history-api.js');
+const schedule = read('frontend/schedule-api.js');
 const styles = read('frontend/styles.css');
 
-for (const [name, source] of Object.entries({ html, app, decisions, mocks, styles })) {
+for (const [name, source] of Object.entries({ html, app, decisions, history, schedule, styles })) {
   assert.doesNotMatch(source, /^(<<<<<<<|=======|>>>>>>>)/m, `${name} contains a merge marker`);
 }
 
@@ -39,12 +40,12 @@ for (const [source, signature] of [
   [decisions, "ui.conditionForm.addEventListener('submit'"],
   [decisions, "ui.recommendForm.addEventListener('submit'"],
   [decisions, "ui.manualForm.addEventListener('submit'"],
-  [mocks, "elements.filter.addEventListener('change'"],
-  [mocks, "elements.buttons.addEventListener('click'"],
-  [mocks, "form.addEventListener('submit'"],
-  [mocks, "elements.prev.addEventListener('click'"],
-  [mocks, "elements.next.addEventListener('click'"],
-  [mocks, "elements.grid.addEventListener('click'"],
+  [history, "ui.buttons.addEventListener('click'"],
+  [history, "ui.save.addEventListener('click'"],
+  [schedule, "form.addEventListener('submit'"],
+  [schedule, "ui.prev.addEventListener('click'"],
+  [schedule, "ui.next.addEventListener('click'"],
+  [schedule, "ui.grid.addEventListener('click'"],
 ]) {
   assert.equal(count(source, signature), 1, `event registration is missing or duplicated: ${signature}`);
 }

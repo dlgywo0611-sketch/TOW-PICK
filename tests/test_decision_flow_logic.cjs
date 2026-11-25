@@ -53,11 +53,13 @@ test('recommendation available only with two submissions and no candidate', () =
   assert.equal(logic.canRecommend(decision(), both, true), false);
   assert.equal(logic.canRecommend(decision({ id: 1 }), both), false);
   assert.equal(logic.canRecommend(decision(null, 'confirmed', true), both), false);
+  assert.equal(logic.canRecommend({ ...decision(), recommendation_attempted: true }, both), false);
 });
 test('cannot edit private conditions after a candidate exists', () => {
   assert.equal(logic.canEditConditions(decision()), true);
   assert.equal(logic.canEditConditions(decision({ id: 2 })), false);
   assert.equal(logic.canEditConditions(decision(null, 'confirmed')), false);
+  assert.equal(logic.canEditConditions(decision(), true), false);
 });
 test('approval belongs only to logged-in member and latest candidate', () => {
   const c = { id: 8, member_approvals: [{ user_id: 1, approved: true }, { user_id: 2, approved: false }] };
@@ -79,8 +81,11 @@ test('recommendation failure exposes a safe manual fallback', () => {
   assert.equal(failed.visible, true);
   assert.equal(failed.canUseManual, true);
   assert.match(failed.message, /추천 후보/);
+  assert.match(failed.message, /조건 수정과 재추천은 불가능/);
+  assert.match(failed.message, /새로운 공동결정/);
   const withCandidate = logic.getRecommendationFallbackState(decision({ id: 3 }), both, true, '실패');
   assert.equal(withCandidate.visible, false);
+  assert.equal(logic.getRecommendationFallbackState({ ...decision(), recommendation_attempted: true }, both).visible, true);
 });
 test('decision stage explains condition, candidate, approval and confirmation waits', () => {
   const waiting = { member_conditions: [{ user_id: 1, submitted: true }, { user_id: 2, submitted: false }] };

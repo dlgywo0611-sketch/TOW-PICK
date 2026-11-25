@@ -1,0 +1,14 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const context = { globalThis: {} };
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'frontend', 'notification-logic.js'), 'utf8'), context);
+const logic = context.globalThis.TwoPickNotificationLogic;
+const items = [{ id: 1, created_at: '2026-01-01' }, { id: 2, created_at: '2026-01-02' }];
+assert.equal(logic.unreadCount(items, []), 2);
+assert.equal(logic.unreadCount(items, ['1']), 1);
+assert.deepEqual(Array.from(logic.markRead(['1'], 1)), ['1']);
+assert.deepEqual(Array.from(logic.markRead(['1'], 2)), ['1', '2']);
+assert.equal(logic.sortNotifications(items)[0].id, 2);
+console.log('PASS: notification unread, read and sorting states');

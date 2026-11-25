@@ -1,5 +1,5 @@
 {
-  "name": "two-pick-regression-tests",
+  "name": "two-pick-frontend-tests",
   "private": true,
   "scripts": {
     "test": "node tests/run-frontend-tests.cjs",
