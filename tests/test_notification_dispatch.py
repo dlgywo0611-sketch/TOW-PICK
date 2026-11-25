@@ -17,7 +17,7 @@ import main
 import models
 import notification_dispatch as dispatch
 import notification_logic
-from database import Base
+from database import Base, ensure_notification_attempt_columns
 
 
 class NotificationDispatchTests(unittest.TestCase):
@@ -292,6 +292,93 @@ class NotificationDispatchTests(unittest.TestCase):
         ):
             self.assertEqual(self.client.post(path, json=body,
                                               headers=self.headers).status_code, 422)
+
+    def test_test_email_requires_explicit_gate_and_receipt(self):
+        path = f"/internal/notifications/{self.job_id}/claim"
+        with patch.dict(os.environ, {"TWO_PICK_N8N_ENABLE_TEST_EMAIL": "0"}):
+            self.assertEqual(self.client.post(path, json={"mode": "test_email"},
+                                              headers=self.headers).status_code, 409)
+        with patch.dict(os.environ, {
+            "TWO_PICK_N8N_ENABLE_TEST_EMAIL": "1",
+            "TWO_PICK_N8N_TEST_RECIPIENT": "approved@example.test",
+        }):
+            claim = self.client.post(path, json={"mode": "test_email"},
+                                     headers=self.headers)
+            self.assertEqual(claim.status_code, 200, claim.text)
+            self.assertEqual(claim.json()["recipient_email"], "approved@example.test")
+            verify = self.client.post(
+                f"/internal/notifications/{self.job_id}/verify",
+                headers=self.headers)
+            self.assertTrue(verify.json()["eligible"])
+            self.assertEqual(verify.json()["recipient_email"], "approved@example.test")
+            result_path = f"/internal/notifications/{self.job_id}/result"
+            self.assertEqual(self.client.post(result_path, json={
+                "attempt": 1, "result": "sent"}, headers=self.headers).status_code, 422)
+            receipt = {"attempt": 1, "result": "sent",
+                       "provider_message_id": "synthetic-message-1"}
+            saved = self.client.post(result_path, json=receipt, headers=self.headers)
+            self.assertEqual(saved.status_code, 200, saved.text)
+            self.assertEqual(saved.json()["status"], "sent")
+            duplicate = self.client.post(result_path, json=receipt,
+                                         headers=self.headers)
+            self.assertTrue(duplicate.json()["idempotent"])
+            with self.sessions() as db:
+                job = db.get(models.NotificationJob, self.job_id)
+                attempt = dispatch.latest_attempt(db, self.job_id)
+                self.assertIsNotNone(job.succeeded_at)
+                self.assertEqual(attempt.provider_message_id, "synthetic-message-1")
+                self.assertEqual(attempt.mode, "test_email")
+
+    def test_email_claim_cap_counts_failed_claims_too(self):
+        with self.sessions() as db:
+            for number in (2, 3):
+                db.add(models.NotificationJob(
+                    schedule_id=self.schedule_id, schedule_revision=1,
+                    recipient_user_id=self.user_id, notification_type="day_of",
+                    occurrence_date=date.today(),
+                    send_at=self.now - timedelta(seconds=30),
+                    dedupe_key=f"{number}" * 64, status="pending",
+                    attempt_count=0))
+            db.commit()
+        with patch.dict(os.environ, {
+            "TWO_PICK_N8N_ENABLE_TEST_EMAIL": "1",
+            "TWO_PICK_N8N_TEST_RECIPIENT": "approved@example.test",
+        }):
+            for job_id in (self.job_id, self.job_id + 1):
+                claim = self.client.post(f"/internal/notifications/{job_id}/claim",
+                    json={"mode": "test_email"}, headers=self.headers)
+                self.assertEqual(claim.status_code, 200, claim.text)
+            self.assertEqual(self.client.post(
+                f"/internal/notifications/{self.job_id + 2}/claim",
+                json={"mode": "test_email"}, headers=self.headers).status_code, 409)
+            failed = self.client.post(
+                f"/internal/notifications/{self.job_id}/result",
+                json={"attempt": 1, "result": "failed",
+                      "error_code": "delivery_failed"}, headers=self.headers)
+            self.assertEqual(failed.json()["status"], "failed")
+            self.assertEqual(self.client.post(
+                f"/internal/notifications/{self.job_id + 2}/claim",
+                json={"mode": "test_email"}, headers=self.headers).status_code, 409)
+
+    def test_attempt_ledger_migration_preserves_existing_row(self):
+        legacy = create_engine("sqlite:///" + str(Path(self.temp.name) / "legacy.db"))
+        try:
+            with legacy.begin() as conn:
+                conn.exec_driver_sql("CREATE TABLE notification_dispatch_attempts ("
+                    "id INTEGER PRIMARY KEY, job_id INTEGER, number INTEGER, "
+                    "status VARCHAR(20), claimed_at DATETIME, completed_at DATETIME, "
+                    "retry_after DATETIME, error_code VARCHAR(40))")
+                conn.exec_driver_sql("INSERT INTO notification_dispatch_attempts "
+                    "(id, job_id, number, status, claimed_at) "
+                    "VALUES (1, 1, 1, 'simulated', '2026-11-25 00:00:00')")
+            ensure_notification_attempt_columns(legacy)
+            with legacy.connect() as conn:
+                row = conn.exec_driver_sql("SELECT status, mode, "
+                    "provider_message_id FROM notification_dispatch_attempts "
+                    "WHERE id=1").one()
+            self.assertEqual(tuple(row), ("simulated", "mock", None))
+        finally:
+            legacy.dispose()
 
 
 if __name__ == "__main__":

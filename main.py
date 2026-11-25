@@ -15,7 +15,8 @@ import models
 import notification_logic
 import notification_dispatch
 import schemas
-from database import Base, engine, ensure_current_candidate_index, get_db
+from database import (Base, engine, ensure_current_candidate_index,
+                      ensure_notification_attempt_columns, get_db)
 from recommendation_engine import choose_balanced_option
 
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -32,6 +33,7 @@ from auth import (
 
 Base.metadata.create_all(bind=engine)
 ensure_current_candidate_index(engine)
+ensure_notification_attempt_columns(engine)
 
 app = FastAPI(
     title="TOW-PICK API",
@@ -1240,10 +1242,13 @@ def read_due_notification_jobs(db: Session = Depends(get_db)):
 
 @app.post("/internal/notifications/{job_id}/claim",
           dependencies=[Depends(require_internal_n8n)])
-def claim_notification_job(job_id: int, db: Session = Depends(get_db)):
+def claim_notification_job(job_id: int,
+                           request: schemas.NotificationClaimInput | None = None,
+                           db: Session = Depends(get_db)):
     begin_sqlite_write(db)
     try:
-        result = notification_dispatch.claim_job(db, job_id)
+        result = notification_dispatch.claim_job(db, job_id,
+            mode=request.mode if request is not None else "mock")
     except notification_dispatch.DispatchConflict as error:
         db.rollback()
         raise HTTPException(status_code=409, detail=str(error)) from error
@@ -1255,10 +1260,15 @@ def claim_notification_job(job_id: int, db: Session = Depends(get_db)):
           dependencies=[Depends(require_internal_n8n)])
 def verify_notification_job(job_id: int, db: Session = Depends(get_db)):
     job = db.get(models.NotificationJob, job_id)
-    return {"job_id": job_id,
+    eligible = notification_dispatch.verify_claim(db, job_id)
+    attempt = notification_dispatch.latest_attempt(db, job_id) if job else None
+    response = {"job_id": job_id,
             "attempt": job.attempt_count if job is not None else None,
             "notification_type": job.notification_type if job is not None else None,
-            "eligible": notification_dispatch.verify_claim(db, job_id)}
+            "eligible": eligible}
+    if eligible and attempt is not None and attempt.mode == "test_email":
+        response["recipient_email"] = os.environ["TWO_PICK_N8N_TEST_RECIPIENT"]
+    return response
 
 
 @app.post("/internal/notifications/{job_id}/result",
@@ -1270,7 +1280,8 @@ def record_notification_result(job_id: int,
     try:
         result = notification_dispatch.finish_job(
             db, job_id, attempt_number=request.attempt,
-            result=request.result, error_code=request.error_code)
+            result=request.result, error_code=request.error_code,
+            provider_message_id=request.provider_message_id)
     except notification_dispatch.DispatchConflict as error:
         db.rollback()
         raise HTTPException(status_code=409, detail=str(error)) from error

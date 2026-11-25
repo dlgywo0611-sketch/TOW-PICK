@@ -32,6 +32,25 @@ def ensure_current_candidate_index(db_engine):
             "and resolve them before applying the phase 2 index"
         ) from error
 
+
+def ensure_notification_attempt_columns(db_engine):
+    """Extend an earlier attempt ledger without replacing its existing rows."""
+    with db_engine.begin() as connection:
+        if db_engine.dialect.name != "sqlite":
+            return
+        names = {row[1] for row in connection.exec_driver_sql(
+            "PRAGMA table_info(notification_dispatch_attempts)")}
+        if not names:
+            return
+        if "mode" not in names:
+            connection.exec_driver_sql(
+                "ALTER TABLE notification_dispatch_attempts "
+                "ADD COLUMN mode VARCHAR(20) NOT NULL DEFAULT 'mock'")
+        if "provider_message_id" not in names:
+            connection.exec_driver_sql(
+                "ALTER TABLE notification_dispatch_attempts "
+                "ADD COLUMN provider_message_id VARCHAR(255)")
+
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,

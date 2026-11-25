@@ -1,12 +1,13 @@
-"""Server-side notification claims and mock delivery results.
+"""Server-side notification claims and gated test delivery results.
 
-No email or n8n request is made here. All timestamps stored in SQLite are UTC
-without an offset, matching the existing NotificationJob.send_at column.
+This module makes no email or n8n request. All timestamps stored in SQLite are
+UTC without an offset, matching the existing NotificationJob.send_at column.
 """
 
+import os
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import models
@@ -15,6 +16,7 @@ import notification_logic
 SEND_WINDOW = timedelta(minutes=10)  # Existing prepare_mock_payload contract.
 CLAIM_TIMEOUT = timedelta(minutes=2)
 MAX_ATTEMPTS = 3
+TEST_EMAIL_CLAIM_LIMIT = 2
 
 
 class DispatchConflict(ValueError):
@@ -85,8 +87,19 @@ def due_job_ids(db: Session, now: datetime | None = None) -> list[int]:
     return ready
 
 
-def claim_job(db: Session, job_id: int, now: datetime | None = None) -> dict:
+def test_email_target() -> str | None:
+    target = os.getenv("TWO_PICK_N8N_TEST_RECIPIENT", "").strip()
+    if (os.getenv("TWO_PICK_N8N_ENABLE_TEST_EMAIL") != "1"
+            or not target or "@" not in target):
+        return None
+    return target
+
+
+def claim_job(db: Session, job_id: int, now: datetime | None = None,
+              *, mode: str = "mock") -> dict:
     current = utc_naive(now)
+    if mode not in ("mock", "test_email"):
+        raise DispatchConflict("Unsupported dispatch mode")
     job = db.get(models.NotificationJob, job_id)
     if job is None or job.status != "pending":
         raise DispatchConflict("Job is not pending")
@@ -97,19 +110,29 @@ def claim_job(db: Session, job_id: int, now: datetime | None = None) -> dict:
         raise DispatchConflict("Retry is not due")
     if job.attempt_count >= MAX_ATTEMPTS or not _valid_context(db, job):
         raise DispatchConflict("Job is no longer eligible")
+    if mode == "test_email":
+        if test_email_target() is None:
+            raise DispatchConflict("Test email delivery is disabled")
+        claim_count = db.scalar(select(func.count(models.NotificationDispatchAttempt.id)).where(
+            models.NotificationDispatchAttempt.mode == "test_email"))
+        if claim_count >= TEST_EMAIL_CLAIM_LIMIT:
+            raise DispatchConflict("Test email claim limit reached")
     notification_logic.prepare_mock_payload(
         db, job_id, now=current.replace(tzinfo=timezone.utc))
     job.attempt_count += 1
     job.status = "claimed"
     db.add(models.NotificationDispatchAttempt(
-        job_id=job.id, number=job.attempt_count, status="claimed",
+        job_id=job.id, number=job.attempt_count, mode=mode, status="claimed",
         claimed_at=current,
     ))
     db.flush()
-    # The mock workflow only needs routing metadata. Keep even test addresses
-    # and schedule details out of n8n execution data.
-    return {"job_id": job.id, "attempt": job.attempt_count,
-            "notification_type": job.notification_type, "mode": "mock"}
+    # The mock workflow only needs routing metadata. In the separately gated
+    # email test, the approved destination is supplied from the local env.
+    response = {"job_id": job.id, "attempt": job.attempt_count,
+                "notification_type": job.notification_type, "mode": mode}
+    if mode == "test_email":
+        response["recipient_email"] = test_email_target()
+    return response
 
 
 def verify_claim(db: Session, job_id: int, now: datetime | None = None) -> bool:
@@ -120,22 +143,31 @@ def verify_claim(db: Session, job_id: int, now: datetime | None = None) -> bool:
                 and attempt.status == "claimed"
                 and attempt.claimed_at + CLAIM_TIMEOUT >= current
                 and current <= job.send_at + SEND_WINDOW
-                and _valid_context(db, job))
+                and _valid_context(db, job)
+                and (attempt.mode != "test_email" or test_email_target() is not None))
 
 
 def finish_job(db: Session, job_id: int, *, attempt_number: int,
                result: str, error_code: str | None = None,
+               provider_message_id: str | None = None,
                now: datetime | None = None) -> dict:
     current = utc_naive(now)
     job = db.get(models.NotificationJob, job_id)
     attempt = latest_attempt(db, job_id) if job else None
     if not job or not attempt or attempt.number != attempt_number:
         raise DispatchConflict("Claim does not match the job")
-    if attempt.status == result and (result != "failed" or attempt.error_code == error_code):
+    if (attempt.status == result
+            and (result != "failed" or attempt.error_code == error_code)
+            and (result != "sent" or attempt.provider_message_id == provider_message_id)):
         return {"job_id": job.id, "status": job.status,
                 "attempt": attempt.number, "idempotent": True}
     if job.status != "claimed" or attempt.status != "claimed":
         raise DispatchConflict("Claim is no longer active")
+    if result == "sent" and (attempt.mode != "test_email"
+                            or not provider_message_id):
+        raise DispatchConflict("Sent result requires a claimed test email and receipt")
+    if result == "simulated" and attempt.mode != "mock":
+        raise DispatchConflict("Mock result requires a mock claim")
     if result == "simulated":
         if not verify_claim(db, job_id, now=current.replace(tzinfo=timezone.utc)):
             attempt.status = "canceled"
@@ -151,6 +183,15 @@ def finish_job(db: Session, job_id: int, *, attempt_number: int,
         if schedule is not None and schedule.deleted_at is None:
             notification_logic.plan_next_jobs(
                 db, schedule, now=current.replace(tzinfo=timezone.utc))
+    elif result == "sent":
+        job.status = "sent"
+        job.succeeded_at = current
+        attempt.status = "sent"
+        attempt.provider_message_id = provider_message_id
+        schedule = db.get(models.CoupleSchedule, job.schedule_id)
+        if schedule is not None and schedule.deleted_at is None:
+            notification_logic.plan_next_jobs(
+                db, schedule, now=current.replace(tzinfo=timezone.utc))
     elif result == "canceled":
         attempt.status = "canceled"
         job.status = "canceled"
@@ -162,7 +203,8 @@ def finish_job(db: Session, job_id: int, *, attempt_number: int,
             job.status = "unknown"
         elif error_code == "auth_error":
             job.status = "failed"
-        elif job.attempt_count < MAX_ATTEMPTS and current < job.send_at + SEND_WINDOW:
+        elif (attempt.mode == "mock" and job.attempt_count < MAX_ATTEMPTS
+              and current < job.send_at + SEND_WINDOW):
             attempt.retry_after = current + timedelta(seconds=60 * job.attempt_count)
             job.status = "pending"
         else:
