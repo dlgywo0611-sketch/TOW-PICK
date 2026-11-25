@@ -140,6 +140,50 @@ class AuthCoupleApiTests(unittest.TestCase):
         self.assertEqual(other.status_code, 403)
         self.assertEqual(self.client.get("/decisions", headers=c).json(), [])
 
+    def test_expiry_reissue_invalidates_previous_code(self):
+        for email in ("a@example.test", "b@example.test", "c@example.test"):
+            self.register(email)
+        a, b, c = (self.headers(f"{letter}@example.test") for letter in "abc")
+        created = self.client.post("/couples", headers=a)
+        old_code = created.json()["invite_code"]
+        with self.sessions() as db:
+            invite = db.get(models.CoupleInvite, created.json()["id"])
+            invite.issued_at = datetime.now(timezone.utc) - timedelta(hours=25)
+            db.commit()
+        expired = self.client.post("/couples/join", headers=b,
+                                   json={"invite_code": old_code})
+        self.assertEqual(expired.status_code, 410)
+        renewed = self.client.post("/couples/invite-code", headers=a)
+        self.assertEqual(renewed.status_code, 200)
+        new_code = renewed.json()["invite_code"]
+        self.assertNotEqual(new_code, old_code)
+        self.assertEqual(self.client.post("/couples/join", headers=b,
+                                         json={"invite_code": old_code}).status_code, 404)
+        self.assertEqual(self.client.post("/couples/join", headers=b,
+                                         json={"invite_code": new_code}).status_code, 200)
+        self.assertEqual(self.client.post("/couples/invite-code", headers=a).status_code, 409)
+        self.assertEqual(self.client.post("/couples/join", headers=c,
+                                         json={"invite_code": new_code}).status_code, 409)
+
+    def test_legacy_unissued_code_requires_reissue(self):
+        for email in ("a@example.test", "b@example.test"):
+            self.register(email)
+        a, b = (self.headers(f"{letter}@example.test") for letter in "ab")
+        with self.sessions() as db:
+            couple = models.Couple(invite_code="LEGACY01")
+            db.add(couple)
+            db.flush()
+            owner = db.scalar(select(models.User).where(models.User.email == "a@example.test"))
+            owner.couple_id = couple.id
+            db.commit()
+        self.assertEqual(self.client.post("/couples/join", headers=b,
+                                         json={"invite_code": "LEGACY01"}).status_code, 410)
+        renewed = self.client.post("/couples/invite-code", headers=a)
+        self.assertEqual(renewed.status_code, 200)
+        self.assertEqual(self.client.post("/couples/join", headers=b, json={
+            "invite_code": renewed.json()["invite_code"]
+        }).status_code, 200)
+
     def test_concurrent_join_keeps_two_member_capacity(self):
         with TemporaryDirectory() as temporary:
             db_path = Path(temporary) / "couple-test.db"
@@ -153,6 +197,10 @@ class AuthCoupleApiTests(unittest.TestCase):
                 couple = models.Couple(invite_code="RACE0001")
                 db.add(couple)
                 db.flush()
+                db.add(models.CoupleInvite(
+                    couple_id=couple.id, code=couple.invite_code,
+                    issued_at=models.utc_now(),
+                ))
                 for letter in "abc":
                     db.add(models.User(
                         email=f"race-{letter}@example.test",
