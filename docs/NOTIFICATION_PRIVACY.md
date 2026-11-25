@@ -12,7 +12,7 @@
 
 이 문서는 OURVERSE 3.0의 SMART COUPLE CARE에서 기념일 또는 일정 등록 후 n8n을 통해 알림을 발송하기 위한 설계 원칙을 정의한다.
 
-현재 저장소에는 일정 모델·API, 사용자별 알림 동의 API, 미발송 작업 원장이 있다. 실제 n8n workflow, Gmail 발송, 발송 결과·재시도 worker는 아직 없다. 아래 원칙 중 실제 계약은 `API_CONTRACT.md`의 2026-11-25 2차 백엔드 계약을 따른다.
+현재 저장소에는 일정 모델·API, 사용자별 알림 동의 API, 미발송 작업 원장과 **입력 검증용 n8n Test Webhook 워크플로**가 있다. 운영 알림 발송 workflow, Gmail 발송, 발송 결과·재시도 worker는 아직 없다. 아래 원칙 중 실제 계약은 `API_CONTRACT.md`와 테스트 연동 문서 `N8N_WEBHOOK_INTEGRATION_20261125.md`를 따른다.
 
 프론트엔드와 n8n은 `API_CONTRACT.md`에 없는 발송 endpoint나 schema를 임의로 가정하지 않는다. n8n 연결과 실제 전송 전에는 인증·재시도·결과 기록 계약을 별도로 확정해야 한다.
 
@@ -281,7 +281,7 @@ dedupe_key = hash(
 | 사용자별 알림 동의·철회 | implemented (backend) | PASS (자동 테스트) | UI 미연결 |
 | 알림 작업·중복 방지 원장 | partial | PASS (예약·취소 Mock) | 발송 상태 전이·재시도 미구현 |
 | `Asia/Seoul` 예약 계산 | partial | PASS (자동 테스트) | 실제 장기 운영 scheduler 미구현 |
-| n8n workflow·Webhook | planned | NOT TESTED | workflow 생성·실행 안 됨 |
+| n8n 입력 검증 Test Webhook | partial | 기존 워크플로 6/6은 사용자 제공 결과; 백엔드 가상 작업 1건 HTTP 200 실측 | 실제 알림 발송 workflow와 별개 |
 | Gmail/테스트 메일 발송 | planned | NOT TESTED | 실제 발송 결과 없음 |
 | 실패 재시도·중복 방지 | partial | 중복 예약 PASS, 재시도 NOT TESTED | 실제 발송 전 중복 차단은 미구현 |
 | 개인정보 최소 payload | partial | PASS (Mock) | 실제 n8n 전송은 NOT TESTED |

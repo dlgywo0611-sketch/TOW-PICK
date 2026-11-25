@@ -50,3 +50,22 @@ Git에 등록한 JSON은 원본 GitHub 등록용 파일과 동일하며 `active:
 ### 운영 연결 전 확인
 
 현재 워크플로는 입력 형식 테스트다. 이 결과가 백엔드의 사용자별 알림 동의 확인, 작업 원장 중복 발송 방지, 재시도, Gmail 발송 검증을 대신하지 않는다. 실제 전송 경로는 [`docs/NOTIFICATION_PRIVACY.md`](../docs/NOTIFICATION_PRIVACY.md)의 동의·최소 전송 규칙과 백엔드 발송 직전 재검증을 구현한 뒤 별도로 연결한다.
+
+## FastAPI 알림 기반 → 로컬 n8n Test URL 연동
+
+`python -m n8n.test_webhook`은 기존 `notification_logic.prepare_mock_payload`로 **임시 SQLite의 가상 알림 작업**을 준비하고, 명시적으로 `--live`를 붙였을 때만 n8n에 한 건 전송한다. 실제 `tow_pick.db`, 실제 사용자 이메일, Gmail, 작업 `sent` 상태는 사용하지 않는다. 이 명령은 FastAPI의 공개 발송 API가 아니다. 상세 계약과 후속 과제는 [`N8N_WEBHOOK_INTEGRATION_20261125.md`](../docs/N8N_WEBHOOK_INTEGRATION_20261125.md)에 있다.
+
+1. 로컬 n8n 서버와 `TWO PICK - 01 Webhook Test` 워크플로의 `X-Two-Pick-Secret` Header Auth credential을 준비한다. **인증 값은 채팅·Git·명령줄 인자로 적지 않는다.** Git에서 제외되는 프로젝트 `.env`에 `TWO_PICK_N8N_WEBHOOK_SECRET=<로컬 테스트 키>`를 설정한다.
+2. 같은 `.env` 또는 실행할 셸 환경에 `TWO_PICK_N8N_WEBHOOK_URL=http://localhost:5678/webhook-test/two-pick-test`를 설정한다. 클라이언트는 이 로컬 Test URL만 허용한다.
+3. 네트워크 요청 없이 가상 DB·payload를 확인하려면 저장소 루트에서 `python -m n8n.test_webhook --case valid`를 실행한다.
+4. n8n Webhook 노드에서 **Listen for test event**를 누른 **직후** 아래 명령을 한 개 실행한다. Test URL은 한 번의 요청 후 또는 대기 시간 종료 후 다시 대기해야 하므로 **각 live 명령 전에 다시 누른다.**
+
+```powershell
+python -m n8n.test_webhook --case valid --live
+python -m n8n.test_webhook --case missing-field --live
+python -m n8n.test_webhook --case unexpected-field --live
+python -m n8n.test_webhook --case missing-auth --live
+python -m n8n.test_webhook --case wrong-auth --live
+```
+
+Windows 가상환경에서는 `python` 대신 `.\.venv\Scripts\python.exe`를 사용할 수 있다. 기대 상태는 순서대로 200, 400, 400, 403, 403이다. 기존 6개 시나리오의 두 번째 정상 인증 키 200은 `valid`를 다시 실행하면 된다. 404는 Test URL 대기 종료나 경로 오류 가능성을 확인해야 하는 **FAIL**이며 PASS로 세지 않는다. 연결 실패·시간 초과도 FAIL로 기록하고 자동 재시도하지 않는다. 인증 키나 응답 원문을 Git 증빙에 포함하지 않는다.
