@@ -228,6 +228,7 @@ elements.signupForm.addEventListener('submit', async (event) => {
       method: 'POST',
       body: JSON.stringify({ email: formData.get('email'), nickname: formData.get('nickname'), password: formData.get('password') }),
     });
+    localStorage.setItem('tow_pick_onboarding_pending', String(formData.get('email')).trim().toLowerCase());
     elements.loginForm.email.value = formData.get('email');
     elements.loginForm.password.focus();
     showAlert('계정을 만들었습니다. 왼쪽에서 로그인해 주세요.', true);

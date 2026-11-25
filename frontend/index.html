@@ -17,6 +17,8 @@
     <script src="/static/dashboard.js" defer></script>
     <script src="/static/service-shell-logic.js" defer></script>
     <script src="/static/service-shell.js" defer></script>
+    <script src="/static/onboarding-logic.js" defer></script>
+    <script src="/static/onboarding.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">본문으로 바로가기</a>
@@ -481,5 +483,26 @@
         </section>
       </section>
     </main>
+
+    <div id="onboarding" class="onboarding hidden" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+      <div class="onboarding-backdrop"></div>
+      <section class="onboarding-dialog">
+        <button id="onboarding-close" class="onboarding-close" type="button" aria-label="온보딩 나중에 보기">×</button>
+        <div class="onboarding-visual" aria-hidden="true"><span>O</span><i>♥</i><span>V</span></div>
+        <p class="eyebrow coral">WELCOME TO OURVERSE</p>
+        <h2 id="onboarding-title">둘만의 공간을 시작해요.</h2>
+        <p id="onboarding-description">회원가입이 완료됐어요. 세 단계면 첫 공동결정을 시작할 수 있어요.</p>
+        <ol id="onboarding-steps" class="onboarding-steps">
+          <li data-onboarding-step="account"><span>1</span><div><strong>내 계정으로 로그인</strong><small>각자의 승인을 구분해요.</small></div></li>
+          <li data-onboarding-step="couple"><span>2</span><div><strong>커플 연결</strong><small>초대 코드를 만들거나 입력해요.</small></div></li>
+          <li data-onboarding-step="decision"><span>3</span><div><strong>첫 공동결정</strong><small>비공개 조건을 따로 제출해요.</small></div></li>
+        </ol>
+        <p id="onboarding-hint" class="onboarding-hint" aria-live="polite"></p>
+        <div class="onboarding-actions">
+          <button id="onboarding-later" class="decision-secondary" type="button">나중에</button>
+          <button id="onboarding-action" class="decision-primary" type="button">커플 연결 시작하기</button>
+        </div>
+      </section>
+    </div>
   </body>
 </html>
