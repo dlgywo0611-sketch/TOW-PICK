@@ -1,0 +1,12 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const context = { globalThis: {} };
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'frontend', 'settings-logic.js'), 'utf8'), context);
+const logic = context.globalThis.TwoPickSettingsLogic;
+assert.equal(JSON.stringify(logic.validateNickname('  우리   둘  ')), JSON.stringify({ valid: true, message: '', value: '우리 둘' }));
+assert.equal(logic.validateNickname('   ').valid, false);
+assert.equal(logic.normalizeNickname('가'.repeat(60)).length, 50);
+assert.equal(JSON.stringify(logic.normalizePreferences({ decision: false, pet: 'yes' })), JSON.stringify({ decision: false, schedule: true, pet: true }));
+console.log('PASS: local account settings validation and preference defaults');

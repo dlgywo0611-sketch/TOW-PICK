@@ -441,6 +441,28 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .profile-safety-note p { margin: 4px 0 0; font-size: 9px; line-height: 1.6; }
 @media (max-width: 650px) { .couple-profile-members { grid-template-columns: 1fr; } .couple-info-card { align-items: stretch; flex-direction: column; } .couple-info-card .decision-secondary { width: 100%; } }
 
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--line); }
+.settings-card { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+.settings-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 15px; }
+.settings-card h4 { margin: 2px 0 0; font: 500 18px Georgia, serif; }
+.settings-form { display: grid; gap: 11px; }
+.settings-form label { display: grid; gap: 6px; color: #504a43; font-size: 9px; font-weight: 900; }
+.settings-form input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font: inherit; font-size: 11px; }
+.settings-form input[readonly] { background: #f2efea; color: var(--muted); }
+.settings-help { margin: 0; color: var(--muted); font-size: 8px; line-height: 1.6; }
+.preference-list { display: grid; gap: 8px; }
+.preference-list > label { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px solid #eee9e1; }
+.preference-list > label:last-child { border-bottom: 0; }
+.preference-list strong, .preference-list small { display: block; }
+.preference-list strong { font-size: 10px; } .preference-list small { margin-top: 3px; color: var(--muted); font-size: 8px; }
+.preference-list input { width: 18px; height: 18px; accent-color: var(--coral); }
+.account-management-card { grid-column: 1 / -1; }
+.account-management-card > p { color: var(--muted); font-size: 9px; }
+.settings-account-actions { display: flex; gap: 8px; margin: 13px 0 9px; }
+.decision-secondary.danger { color: #a24d45; }
+.account-management-card > small { color: var(--muted); font-size: 8px; }
+@media (max-width: 650px) { .settings-grid { grid-template-columns: 1fr; } .account-management-card { grid-column: auto; } .settings-account-actions { flex-direction: column; } }
+
 .our-pet-profile { margin-bottom: 26px; padding-bottom: 26px; border-bottom: 1px solid var(--line); }
 .our-pet-hero { display: grid; grid-template-columns: auto minmax(220px, 1fr) minmax(170px, .7fr); align-items: center; gap: 22px; padding: 22px; border-radius: 18px; background: linear-gradient(135deg, #efe7da, #fff6ec); }
 .our-pet-avatar { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; width: 126px; height: 126px; border: 10px solid rgba(255,255,255,.65); border-radius: 42% 42% 48% 48%; background: #d9c9b2; box-shadow: inset 0 -14px 0 rgba(115,91,61,.1), 0 14px 30px rgba(62,46,27,.11); color: #41382f; }
