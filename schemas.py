@@ -184,3 +184,14 @@ class DecisionApprovalRead(BaseModel):
     approved: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DecisionConfirmationRead(BaseModel):
+    id: int
+    decision_id: int
+    candidate_id: int
+    candidate_version: int
+    content_snapshot: str
+    confirmed_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

@@ -4,9 +4,9 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm import Session, aliased, selectinload
 
 import models
 import schemas
@@ -348,8 +348,33 @@ def join_couple(
             detail="Couple already has two members",
         )
 
-    user.couple_id = couple.id
-    db.commit()
+    member = aliased(models.User)
+    member_count = select(func.count(member.id)).where(
+        member.couple_id == couple.id
+    ).scalar_subquery()
+    try:
+        result = db.execute(
+            update(models.User)
+            .where(
+                models.User.id == user.id,
+                models.User.couple_id.is_(None),
+                member_count < 2,
+            )
+            .values(couple_id=couple.id)
+        )
+        if result.rowcount != 1:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Couple already has two members",
+            )
+        db.commit()
+    except OperationalError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Couple join conflicted with another update",
+        ) from error
 
     joined_couple = get_couple_with_members(db, couple.id)
     return joined_couple
@@ -885,11 +910,38 @@ def approve_candidate(
         and len({item.user_id for item in approvals}) == 2
     ):
         decision.status = "confirmed"
+        db.add(models.DecisionConfirmation(
+            decision_id=decision.id,
+            candidate_id=candidate.id,
+            candidate_version=candidate.version,
+            content_snapshot=candidate.content,
+        ))
 
     db.commit()
     db.refresh(approval)
 
     return approval
+
+
+@app.get(
+    "/decision-confirmations",
+    response_model=list[schemas.DecisionConfirmationRead],
+)
+def read_decision_confirmations(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.couple_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User does not belong to a couple",
+        )
+    return list(db.scalars(
+        select(models.DecisionConfirmation)
+        .join(models.Decision)
+        .where(models.Decision.couple_id == current_user.couple_id)
+        .order_by(models.DecisionConfirmation.id.desc())
+    ).all())
 
 @app.post("/messages", response_model=schemas.MessageRead)
 def create_message(
