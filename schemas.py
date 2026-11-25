@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime, time
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
 
 
 class MessageCreate(BaseModel):
@@ -195,3 +196,76 @@ class DecisionConfirmationRead(BaseModel):
     confirmed_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DecisionFeedbackUpsert(BaseModel):
+    score: StrictInt = Field(ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class DecisionFeedbackRead(DecisionFeedbackUpsert):
+    id: int
+    decision_id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CoupleScheduleInput(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    kind: Literal["schedule", "anniversary"]
+    local_date: date
+    local_time: time | None = None
+    repeat_rule: Literal["none", "weekly", "monthly", "yearly"] | None = None
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def validate_schedule(self):
+        if not self.title.strip():
+            raise ValueError("Title cannot be blank")
+        if self.local_time is not None and self.local_time.tzinfo is not None:
+            raise ValueError("Use a local Asia/Seoul time without offset")
+        if self.repeat_rule is None:
+            self.repeat_rule = "yearly" if self.kind == "anniversary" else "none"
+        if self.kind == "anniversary" and self.repeat_rule not in ("none", "yearly"):
+            raise ValueError("Anniversary repeat must be none or yearly")
+        return self
+
+
+class CoupleScheduleRead(CoupleScheduleInput):
+    id: int
+    couple_id: int
+    created_by_id: int
+    revision: int
+    timezone: Literal["Asia/Seoul"] = "Asia/Seoul"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationSettingInput(BaseModel):
+    consent: bool
+    d1_enabled: bool = False
+    day_of_enabled: bool = False
+    send_time: time = time(9, 0)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("send_time")
+    @classmethod
+    def local_time_only(cls, value: time) -> time:
+        if value.tzinfo is not None:
+            raise ValueError("Use a local Asia/Seoul time without offset")
+        return value
+
+
+class NotificationSettingRead(NotificationSettingInput):
+    user_id: int
+    policy_version: str
+    consented_at: datetime | None = None
+    withdrawn_at: datetime | None = None
+    timezone: Literal["Asia/Seoul"] = "Asia/Seoul"

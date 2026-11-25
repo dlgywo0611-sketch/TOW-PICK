@@ -139,6 +139,36 @@ class BalancedRecommendationAPITests(unittest.TestCase):
         with self.sessions() as db:
             self.assertEqual(db.scalar(select(func.count(models.DecisionConfirmation.id))), 1)
 
+    def test_feedback_is_confirmed_only_and_private_per_account(self):
+        path = f"/decisions/{self.did}/feedback/me"
+        self.assertEqual(self.client.put(path, json={"score": 4},
+                                         headers=self.headers["a"]).status_code, 409)
+        self.condition("a"); self.condition("b")
+        cid = self.client.post(f"/decisions/{self.did}/candidates",
+                               json={"content": "Shared"},
+                               headers=self.headers["a"]).json()["id"]
+        for key in ("a", "b"):
+            self.assertEqual(self.client.post(f"/candidates/{cid}/approve",
+                                              headers=self.headers[key]).status_code, 201)
+        for score in (0, 6):
+            self.assertEqual(self.client.put(path, json={"score": score},
+                                             headers=self.headers["a"]).status_code, 422)
+        self.assertEqual(self.client.put(path, json={"score": 4, "user_id": 999},
+                                         headers=self.headers["a"]).status_code, 422)
+        created = self.client.put(path, json={"score": 4, "comment": "private"},
+                                  headers=self.headers["a"])
+        self.assertEqual(created.status_code, 200)
+        self.assertEqual(self.client.get(path, headers=self.headers["b"]).status_code, 404)
+        self.assertEqual(self.client.get(path, headers=self.headers["c"]).status_code, 403)
+        self.assertNotIn("private", self.client.get(
+            f"/decisions/{self.did}", headers=self.headers["b"]).text)
+        updated = self.client.put(path, json={"score": 5, "comment": None},
+                                  headers=self.headers["a"])
+        self.assertEqual(updated.json()["id"], created.json()["id"])
+        self.assertEqual(updated.json()["score"], 5)
+        with self.sessions() as db:
+            self.assertEqual(db.scalar(select(func.count(models.DecisionFeedback.id))), 1)
+
     def test_uses_each_persons_ceiling_on_two_person_total(self):
         self.condition("a", 30000)
         self.condition("b", 20000)
@@ -192,6 +222,15 @@ class BalancedRecommendationAPITests(unittest.TestCase):
             self.assertEqual(attempt.outcome, "no_match")
             self.assertIsNone(attempt.candidate_id)
             self.assertEqual(db.scalar(select(func.count(models.DecisionCandidate.id))), 0)
+        blocked_change = self.client.put(
+            f"/decisions/{self.did}/conditions/me",
+            json={"max_budget": 20000, "available_time": "토 18:00-20:00",
+                  "preferences": "", "avoidances": ""},
+            headers=self.headers["a"],
+        )
+        self.assertEqual(blocked_change.status_code, 409)
+        self.assertEqual(blocked_change.json()["detail"],
+                         "Conditions cannot be changed after recommendation attempt")
         self.assertEqual(self.recommend().status_code, 409)
         manually = self.client.post(f"/decisions/{self.did}/candidates",
                                     json={"content": "무료 산책"}, headers=self.headers["a"])
