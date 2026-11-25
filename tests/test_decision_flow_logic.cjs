@@ -58,6 +58,7 @@ test('cannot edit private conditions after a candidate exists', () => {
   assert.equal(logic.canEditConditions(decision()), true);
   assert.equal(logic.canEditConditions(decision({ id: 2 })), false);
   assert.equal(logic.canEditConditions(decision(null, 'confirmed')), false);
+  assert.equal(logic.canEditConditions(decision(), true), false);
 });
 test('approval belongs only to logged-in member and latest candidate', () => {
   const c = { id: 8, member_approvals: [{ user_id: 1, approved: true }, { user_id: 2, approved: false }] };
