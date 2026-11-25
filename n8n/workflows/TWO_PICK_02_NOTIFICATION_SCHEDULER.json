@@ -1,0 +1,233 @@
+{
+  "name": "TWO PICK - 02 Notification Scheduler",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        32
+      ],
+      "id": "230c8f16-fc8a-4b56-896c-8cbfc3b63501",
+      "name": "1분 주기 예약 실행"
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = Date.now();\nconst minute = 60 * 1000;\nconst day = 24 * 60 * minute;\n\nfunction kstDate(ms, offset = 0) {\n  return new Date(ms + 9 * 60 * minute + offset * day)\n    .toISOString().slice(0, 10);\n}\n\nfunction createJob(id, name, type, offset, extra = {}) {\n  const sendAt = now + offset * minute;\n\n  return {\n    json: {\n      job_id: id,\n      schedule_id: id,\n      test_case: name,\n      mode: 'mock',\n      notification_type: type,\n      occurrence_date: kstDate(\n        sendAt, type === 'd1' ? 1 : 0\n      ),\n      send_at: new Date(sendAt).toISOString(),\n      checked_at: new Date(now).toISOString(),\n      timezone: 'Asia/Seoul',\n      recipient_email: 'test@example.test',\n      consent: true,\n      type_enabled: true,\n      status: 'pending',\n      schedule_revision: 1,\n      current_revision: 1,\n      expected_eligible: true,\n      ...extra\n    }\n  };\n}\n\nreturn [\n  createJob(1, 'D-1 정상 알림', 'd1', -0.5),\n\n  createJob(2, '당일 정상 알림', 'day_of', -0.5),\n\n  createJob(3, '알림 미동의', 'd1', -1, {\n    consent: false,\n    expected_eligible: false\n  }),\n\n  createJob(4, '발송 시간 미도달', 'day_of', 30, {\n    expected_eligible: false\n  }),\n\n  createJob(5, '이미 발송된 알림', 'd1', -1, {\n    status: 'sent',\n    expected_eligible: false\n  }),\n\n  createJob(6, '발송 허용 시간 초과', 'day_of', -11, {\n    expected_eligible: false\n  }),\n\n  createJob(7, '일정 수정으로 무효화', 'd1', -1, {\n    current_revision: 2,\n    expected_eligible: false\n  }),\n\n  createJob(8, '알림 종류 비활성화', 'day_of', -1, {\n    type_enabled: false,\n    expected_eligible: false\n  })\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        32
+      ],
+      "id": "49121ad0-8de0-4286-a87b-21946cd8f2d8",
+      "name": "가상 알림 데이터 생성"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const job = item.json;\n  const reasons = [];\n\n  const now = Date.parse(job.checked_at);\n  const sendAt = Date.parse(job.send_at);\n  const elapsed = now - sendAt;\n\n  if (job.mode !== 'mock') {\n    reasons.push('테스트 데이터 아님');\n  }\n\n  if (job.consent !== true) {\n    reasons.push('알림 미동의');\n  }\n\n  if (job.type_enabled !== true) {\n    reasons.push('알림 종류 비활성화');\n  }\n\n  if (job.status !== 'pending') {\n    reasons.push('발송 대기 상태 아님');\n  }\n\n  if (job.schedule_revision !== job.current_revision) {\n    reasons.push('일정 변경으로 무효화');\n  }\n\n  if (!Number.isFinite(elapsed)) {\n    reasons.push('잘못된 시간 정보');\n  } else if (elapsed < 0) {\n    reasons.push('발송 시간 미도달');\n  } else if (elapsed > 10 * 60 * 1000) {\n    reasons.push('발송 허용 시간 초과');\n  }\n\n  const eligible = reasons.length === 0;\n\n  return {\n    json: {\n      ...job,\n      eligible,\n      reason: eligible\n        ? '발송 조건 충족'\n        : reasons.join(', '),\n      test_result: eligible === job.expected_eligible\n        ? 'PASS'\n        : 'FAIL'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        32
+      ],
+      "id": "e4d2cf92-2b50-48a7-a3b9-dca45d4f9b05",
+      "name": "알림 발송 조건 검증"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "8bbd8333-7027-40b4-9fc8-f1ca0a0ff824",
+              "leftValue": "={{ $json.eligible }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        672,
+        32
+      ],
+      "id": "ca6364f0-3276-4ab0-86a7-3b53f2b37956",
+      "name": "발송 가능 여부 판단"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const job = item.json;\n\n  const allowed =\n    job.mode === 'mock' &&\n    job.eligible === true &&\n    job.consent === true &&\n    job.recipient_email === 'test@example.test' &&\n    ['d1', 'day_of'].includes(job.notification_type);\n\n  const message = job.notification_type === 'd1'\n    ? '내일은 함께 등록한 일정이 있는 날이에요!'\n    : '오늘은 함께 등록한 일정이 있는 날이에요!';\n\n  return {\n    json: {\n      job_id: job.job_id,\n      test_case: job.test_case,\n      notification_type: job.notification_type,\n      occurrence_date: job.occurrence_date,\n      recipient_email: job.recipient_email,\n      subject: '[TWO PICK] 커플 일정 알림',\n      message: allowed ? message : '',\n      mode: 'mock',\n      delivery_status: allowed\n        ? 'SIMULATED_SUCCESS'\n        : 'BLOCKED',\n      actual_email_sent: false,\n      processed_at: new Date().toISOString(),\n      test_result: allowed ? 'PASS' : 'FAIL'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -64
+      ],
+      "id": "21bd822a-6b36-417b-bdc0-e49385446ca7",
+      "name": "가상 알림 발송 처리"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const job = item.json;\n\n  const passed =\n    job.mode === 'mock' &&\n    job.eligible === false &&\n    job.expected_eligible === false &&\n    job.test_result === 'PASS' &&\n    typeof job.reason === 'string' &&\n    job.reason.trim() !== '';\n\n  return {\n    json: {\n      job_id: job.job_id,\n      test_case: job.test_case,\n      notification_type: job.notification_type,\n      mode: 'mock',\n      delivery_status: 'BLOCKED',\n      blocked_reason: job.reason,\n      actual_email_sent: false,\n      processed_at: new Date().toISOString(),\n      test_result: passed ? 'PASS' : 'FAIL'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        128
+      ],
+      "id": "ae020c5e-104b-46c4-b3e8-86d20c4eefdb",
+      "name": "알림 차단 기록"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1120,
+        32
+      ],
+      "id": "917d4e4f-9850-46ec-a403-53f4215859b7",
+      "name": "처리 결과 통합"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(item => item.json);\n\nconst total = rows.length;\nconst passed = rows.filter(\n  r => r.test_result === 'PASS'\n).length;\n\nconst simulated = rows.filter(\n  r => r.delivery_status === 'SIMULATED_SUCCESS'\n).length;\n\nconst blocked = rows.filter(\n  r => r.delivery_status === 'BLOCKED'\n).length;\n\nconst actualSent = rows.filter(\n  r => r.actual_email_sent === true\n).length;\n\nconst uniqueJobs = new Set(\n  rows.map(r => r.job_id)\n).size;\n\nconst success =\n  total === 8 &&\n  uniqueJobs === 8 &&\n  passed === 8 &&\n  simulated === 2 &&\n  blocked === 6 &&\n  rows.every(r => r.actual_email_sent === false);\n\nreturn [{\n  json: {\n    service: 'TWO PICK',\n    workflow: '02 Notification Scheduler',\n    mode: 'mock',\n    timezone: 'Asia/Seoul',\n    total_tests: total,\n    passed_tests: passed,\n    failed_tests: total - passed,\n    pass_rate: total\n      ? `${(passed / total * 100).toFixed(1)}%`\n      : '0%',\n    simulated_deliveries: simulated,\n    blocked_notifications: blocked,\n    actual_emails_sent: actualSent,\n    unique_jobs: uniqueJobs,\n    overall_result: success ? 'PASS' : 'FAIL',\n    completed_at: new Date().toISOString(),\n    details: rows.map(r => ({\n      job_id: r.job_id,\n      test_case: r.test_case,\n      delivery_status: r.delivery_status,\n      test_result: r.test_result\n    }))\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        32
+      ],
+      "id": "b59fa74c-0a42-497f-bd3b-5b49a34fae37",
+      "name": "최종 테스트 결과 집계"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1분 주기 예약 실행": {
+      "main": [
+        [
+          {
+            "node": "가상 알림 데이터 생성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "가상 알림 데이터 생성": {
+      "main": [
+        [
+          {
+            "node": "알림 발송 조건 검증",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "알림 발송 조건 검증": {
+      "main": [
+        [
+          {
+            "node": "발송 가능 여부 판단",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "발송 가능 여부 판단": {
+      "main": [
+        [
+          {
+            "node": "가상 알림 발송 처리",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "알림 차단 기록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "가상 알림 발송 처리": {
+      "main": [
+        [
+          {
+            "node": "처리 결과 통합",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "알림 차단 기록": {
+      "main": [
+        [
+          {
+            "node": "처리 결과 통합",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "처리 결과 통합": {
+      "main": [
+        [
+          {
+            "node": "최종 테스트 결과 집계",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Seoul",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}
