@@ -605,7 +605,7 @@ SQLite의 경쟁 쓰기는 `BEGIN IMMEDIATE`로 직렬화한다. 현재 후보�
 | 기념일·일정 | implemented (backend) | `/schedules` CRUD; 웹 UI 연결 미검증 |
 | 알림 동의·작업 원장 | partial | `GET/PUT /notifications/settings/me`, 내부 작업 예약·취소; 실제 발송 없음 |
 | n8n 입력 검증 Test Webhook | partial | 로컬 Test URL용 Python CLI; FastAPI 공개 endpoint 아님 |
-| n8n 운영 연동·메일 발송 | planned | 운영 발송 endpoint·scheduler·Gmail workflow 없음 |
+| n8n 발송 작업 연동·메일 발송 | partial | 내부 선점·검증·결과 endpoint와 비활성 03/04 구현. 승인된 Gmail 테스트 메일 2건 도착 확인; 운영 scheduler·서비스 사용자 발송 미구현 |
 | PET 이벤트 영속화 | planned | Web Serial/BLE 이벤트 저장 API 없음 |
 
 ## 11. 기타 현재 구현된 endpoint
@@ -712,6 +712,19 @@ SQLite의 datetime 응답에 timezone offset이 보존된다고 가정하지 않
  "send_time": "09:00:00"}
 ```
 
-응답에는 `user_id`, `policy_version`(`care_reminder_v1`), `consented_at`, `withdrawn_at`, `timezone`(`Asia/Seoul`)이 포함된다. 저장 전 GET은 `consent=false`, 두 종류 선택값 false, 09:00을 반환하며 동의 및 알림 종류 선택 전에는 예약하지 않는다. 한 사람의 설정 변경은 상대방 설정에 영향을 주지 않는다. 서버는 동의한 사람의 다음 반복 발생일에 대한 D-1/당일 작업만 내부 원장에 예약한다. 동일 일정·revision·수신자·종류·발생 날짜의 key는 unique다. 철회·일정 변경·삭제는 pending 작업을 취소한다. 입력 검증 Test Webhook으로의 격리 DB CLI 호출만 추가됐으며, 운영 n8n 발송 API, Gmail 발송, 실행 worker, 재시도 처리는 없다. 내부 mock payload 생성은 최신 동의와 revision을 재확인하며 비공개 조건·JWT를 포함하지 않는다.
+응답에는 `user_id`, `policy_version`(`care_reminder_v1`), `consented_at`, `withdrawn_at`, `timezone`(`Asia/Seoul`)이 포함된다. 저장 전 GET은 `consent=false`, 두 종류 선택값 false, 09:00을 반환하며 동의 및 알림 종류 선택 전에는 예약하지 않는다. 한 사람의 설정 변경은 상대방 설정에 영향을 주지 않는다. 서버는 동의한 사람의 다음 반복 발생일에 대한 D-1/당일 작업만 내부 원장에 예약한다. 동일 일정·revision·수신자·종류·발생 날짜의 key는 unique다. 철회·일정 변경·삭제는 pending 작업을 취소한다. 내부 03 가상 워크플로는 별도 서버 간 인증으로 작업을 선점·재검증·기록하지만 실제 Gmail 발송과 운영 예약 실행은 없다. 내부 mock payload 생성은 최신 동의와 revision을 재확인하며 비공개 조건·JWT를 포함하지 않는다.
+
+## 2026-11-25 CARE 내부 가상 발송 계약
+
+이 경로는 프론트엔드 공개 API가 아니다. `X-Two-Pick-Internal-Secret` 헤더는 Git 제외 `TWO_PICK_N8N_INTERNAL_SECRET`와 비교한다. 누락·불일치 403, 서버 키 미설정 503이다. 사용자 JWT와 수신 이메일은 내부 호출에 보내지 않는다. 03은 로컬 `127.0.0.1:8001` 테스트 FastAPI와 격리 DB에서만 실행했으며 비활성 상태다.
+
+| Method | Path | Auth | Request | Success | 주요 Error |
+|---|---|---|---|---|---|
+| GET | `/internal/notifications/due` | 내부 Header Auth | 없음 | 200 `{ "job_ids": [1] }` | 403, 503 |
+| POST | `/internal/notifications/{job_id}/claim` | 내부 Header Auth | 생략 시 mock; 실메일 시험은 `{ "mode": "test_email" }` | 200 `{ "job_id": 1, "attempt": 1, "notification_type": "d1", "mode": "mock" }` | 403, 409, 422, 503 |
+| POST | `/internal/notifications/{job_id}/verify` | 내부 Header Auth | 없음 | 200 `{ "job_id": 1, "attempt": 1, "notification_type": "d1", "eligible": true }` | 403, 503 |
+| POST | `/internal/notifications/{job_id}/result` | 내부 Header Auth | `{ "attempt": 1, "result": "simulated" }` | 200 `{ "job_id": 1, "status": "simulated", "attempt": 1, "idempotent": false }` | 403, 409, 422, 503 |
+
+결과는 `simulated`/`sent`/`canceled`/`failed` 중 하나다. `failed`에는 `error_code`, `sent`에는 Gmail 접수 ID인 `provider_message_id`가 필요하다. `due`는 불투명 ID만 제공한다. mock `claim`·`verify`에는 수신 주소가 없다. `test_email`은 Git 제외 환경에서 별도로 활성화한 승인 수신 주소만 반환하며 `example.test` 테스트 계정의 작업에만 허용한다. 발송 선점은 격리 DB당 최대 2회이며 실패한 선점도 한도에 포함된다. 작업 선점은 SQLite 쓰기 트랜잭션에서 원자적으로 처리하며 이미 선점·처리한 작업은 재선점 409다. 상세한 상태·재시도·불명 결과 처리와 시험 범위는 [`N8N_CARE_AUTOMATION_20261125.md`](N8N_CARE_AUTOMATION_20261125.md)를 따른다. `simulated`는 이메일 전송을 의미하지 않는다.
 
 프론트엔드는 기존 인증·커플·Decision 호출을 유지하고 새 화면에서 위 경로를 연결한다. Mock 일정 필드는 `date → local_date`, `time → local_time`, `type → kind`, `repeat → repeat_rule`로 변환해야 하며 실제 프론트 Mock 필드명은 연동 시 확인한다. 이 절의 매핑은 제안이며 현재 프론트 코드의 확정 스키마를 뜻하지 않는다.
