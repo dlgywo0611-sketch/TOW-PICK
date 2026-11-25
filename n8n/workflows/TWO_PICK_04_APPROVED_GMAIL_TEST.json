@@ -1,0 +1,358 @@
+{
+  "name": "TWO PICK - 04 Approved Gmail Test",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c9ea1f31-3859-5913-9f54-5b3fe9a09373",
+      "name": "수동 실행 전용"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8002/internal/notifications/due",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        230,
+        0
+      ],
+      "id": "c934b065-8194-553f-b288-398dff87f53f",
+      "name": "테스트 작업 조회"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ids = $input.first().json.job_ids;\nif (!Array.isArray(ids)) throw new Error('Invalid due response');\nreturn ids.length ? [{json: {job_id: ids[0]}}] : [];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "id": "ff072151-7dcf-5e15-9067-28fed28e5a6b",
+      "name": "한 작업만 선택"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8002/internal/notifications/' + $json.job_id + '/claim' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({mode: 'test_email'}) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        0
+      ],
+      "id": "6a3f3e71-d935-5179-9147-122aa26b07d0",
+      "name": "승인된 테스트 수신자 선점"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8002/internal/notifications/' + $json.job_id + '/verify' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        0
+      ],
+      "id": "69084f91-917e-5c09-9b48-5fda261266fa",
+      "name": "발송 직전 동의 재확인"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "46406ae4-7f4b-5673-854c-052cdb0d4fa1",
+              "leftValue": "={{ $json.eligible }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1150,
+        0
+      ],
+      "id": "28dd991d-322e-5fd0-a945-0ff69644e6e6",
+      "name": "발송 가능 여부"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "authentication": "oAuth2",
+        "sendTo": "={{ $json.recipient_email }}",
+        "subject": "TWO PICK 일정 알림 (테스트)",
+        "emailType": "text",
+        "message": "={{ $json.notification_type === 'd1' ? '내일은 함께 등록한 일정이 있습니다.' : '오늘은 함께 등록한 일정이 있습니다.' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1380,
+        -120
+      ],
+      "id": "cdd0809b-5cbb-5472-9a12-9d6945a0700f",
+      "name": "승인된 주소에만 Gmail 발송"
+    },
+    {
+      "parameters": {
+        "jsCode": "const sent = $input.first().json;\nconst job = $('발송 직전 동의 재확인').first().json;\nif (!sent.id) throw new Error('Gmail receipt missing');\nreturn [{json: {job_id: job.job_id, attempt: job.attempt, provider_message_id: sent.id}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1610,
+        -120
+      ],
+      "id": "f247fcb2-a115-5bf6-a597-d806ec4d1a6d",
+      "name": "Gmail 접수 ID 추출"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8002/internal/notifications/' + $json.job_id + '/result' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({attempt: $json.attempt, result: 'sent', provider_message_id: $json.provider_message_id}) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1840,
+        -120
+      ],
+      "id": "17bc73c8-d0dd-5c14-a5df-5a1665130eeb",
+      "name": "발송 성공 원장 기록"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({json: {job_id: item.json.job_id, attempt: item.json.attempt}}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        120
+      ],
+      "id": "8b386c67-6c09-56cc-8cc4-9c4abf6e27ae",
+      "name": "차단 작업 정리"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://127.0.0.1:8002/internal/notifications/' + $json.job_id + '/result' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({attempt: $json.attempt, result: 'canceled'}) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1610,
+        120
+      ],
+      "id": "17c9513f-d6cf-5579-a65d-a7211b8d7a9c",
+      "name": "차단 원장 기록"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "수동 실행 전용": {
+      "main": [
+        [
+          {
+            "node": "테스트 작업 조회",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "테스트 작업 조회": {
+      "main": [
+        [
+          {
+            "node": "한 작업만 선택",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "한 작업만 선택": {
+      "main": [
+        [
+          {
+            "node": "승인된 테스트 수신자 선점",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "승인된 테스트 수신자 선점": {
+      "main": [
+        [
+          {
+            "node": "발송 직전 동의 재확인",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "발송 직전 동의 재확인": {
+      "main": [
+        [
+          {
+            "node": "발송 가능 여부",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "발송 가능 여부": {
+      "main": [
+        [
+          {
+            "node": "승인된 주소에만 Gmail 발송",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "차단 작업 정리",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "승인된 주소에만 Gmail 발송": {
+      "main": [
+        [
+          {
+            "node": "Gmail 접수 ID 추출",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail 접수 ID 추출": {
+      "main": [
+        [
+          {
+            "node": "발송 성공 원장 기록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "차단 작업 정리": {
+      "main": [
+        [
+          {
+            "node": "차단 원장 기록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul",
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "tags": []
+}

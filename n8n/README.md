@@ -99,3 +99,39 @@ Windows 가상환경에서는 `python` 대신 `.\.venv\Scripts\python.exe`를 �
 2026-11-25 n8n 수동 가상 테스트의 **사용자 제공 결과는 8/8 PASS**다. 가상 발송 2건, 정상 차단 6건, 실제 이메일 0건이다. 저장소에는 당시 실행 로그와 개인 데이터를 넣지 않는다. 새 환경에서 재현할 때는 각 항목의 `test_result`와 집계값을 확인하고, 민감정보를 제거한 증빙을 별도 저장소에 보관한다.
 
 이 시험은 **실제 예약 실행, DB 작업 조회·갱신, 발송 동의의 운영 시점 재검증, Gmail 발송, 영속적인 중복 발송 방지**를 검증하지 않는다. 이 항목들은 후속 구현·실물 검증 전까지 완료로 처리하지 않는다.
+
+### 2026-11-25 재검증
+
+로컬 n8n 2.49.5에서 01 Webhook의 6개 HTTP 케이스를 직접 다시 실행해 **6/6 PASS**를 확인했다(정상 200 두 번, 입력 오류 400 두 번, 인증 오류 403 두 번). 02는 수동 실행 **8/8 PASS**, 가상 발송 2건·차단 6건·실제 메일 0건을 확인했다. 가상 데이터만 다루는 02를 일시 게시한 뒤 1분 주기 자동 실행 두 건(ID 193, 195)에서도 각 실행의 8/8 집계를 확인하고 다시 게시 해제했다. 운영 예약·Gmail·실제 사용자 데이터의 검증 결과는 아니다. 실행 원문과 인증 값은 Git에 보관하지 않는다.
+
+## 03 CARE Notification Dispatch — 격리 DB 가상 연동
+
+[`workflows/TWO_PICK_03_CARE_NOTIFICATION_DISPATCH.json`](workflows/TWO_PICK_03_CARE_NOTIFICATION_DISPATCH.json)은 01·02를 보존하면서 별도로 추가한 **비활성** 워크플로다. 1분 Schedule Trigger → FastAPI의 발송 예정 작업 ID 조회 → 원자적 선점 → 동의·일정 revision·시간 창 재검증 → D-1/당일 문구 구성 → **가상 결과만** 기록 → 집계 순서다. HTTP 노드 5개와 분기·병합을 포함해 총 12개 노드이며 Gmail 노드나 실제 전송 경로가 없다. `simulated`는 이메일 발송 성공을 의미하지 않는다.
+
+### 로컬 설정과 실행
+
+1. 최신 FastAPI 코드를 격리된 테스트 SQLite DB와 함께 `127.0.0.1:8001`에서 실행한다. 저장소의 실제 `tow_pick.db`를 테스트용으로 초기화하지 않는다. `SECRET_KEY`와 `TWO_PICK_N8N_INTERNAL_SECRET`을 Git 제외 환경에 설정한다. 03 JSON의 URL은 이 로컬 주소를 가리키므로 다른 포트·호스트에서는 HTTP 노드 URL을 환경에 맞게 변경한다.
+2. n8n의 **Import from File**로 03 JSON을 가져온다. 모든 HTTP Request 노드에 테스트 전용 Header Auth 자격 증명을 연결한다. 헤더 이름은 `X-Two-Pick-Internal-Secret`, 값은 FastAPI의 `TWO_PICK_N8N_INTERNAL_SECRET`와 동일하게 설정한다. JSON에는 자격 증명 ID나 값이 없다. 로컬 n8n에서 자격 증명은 n8n의 암호화된 저장소로만 관리한다.
+3. 테스트 계정은 `example.test` 주소를 쓰고, 사용자별 동의·일정·알림 작업을 격리 DB에서 준비한다. `GET /internal/notifications/due`가 해당 작업 ID만 반환하는지 확인한다. 실제 사용자 이메일은 03의 선점 단계에서 차단된다.
+4. 03은 **게시하지 않고** 편집기에서 **Execute workflow**로 실행한다. 마지막 집계에서 `total`, `simulated`, `blocked`, `actual_emails_sent`를 확인한다. `actual_emails_sent`는 0이어야 한다. 같은 데이터를 다시 실행하면 이미 처리된 작업이 다시 선점되지 않아야 한다.
+5. 실제 운영 연결 전에는 별도 서버 간 키 관리, 발송 채널 승인, 결과 불명 작업의 수동 대조, 실메일 중복 발송 위험 검토가 필요하다. 이 JSON을 그대로 게시하여 운영하지 않는다.
+
+서버 내부 API 계약과 오류 정책은 [`N8N_CARE_AUTOMATION_20261125.md`](../docs/N8N_CARE_AUTOMATION_20261125.md)에 있다. `GET /internal/notifications/due`는 작업 ID만 제공하고, 선점·검증 응답도 수신 이메일이나 비공개 조건을 포함하지 않는다. 01의 `X-Two-Pick-Secret`과 03의 `X-Two-Pick-Internal-Secret`은 서로 다른 키다.
+
+### 이번 실행 결과와 한계
+
+2026-11-25 로컬 n8n에서 03 수동 실행으로 격리 DB의 D-1·당일 작업 **2/2 가상 처리**, 원장 시도 각 1건, 실제 이메일 0건을 확인했다. 두 사용자를 실제 FastAPI 회원가입·로그인·커플 연결 API로 만들고, 일정 등록·사용자별 알림 동의 API로 생성한 작업 2건도 03에서 **2/2 가상 처리**했다. 해당 두 작업의 `status=simulated`, `succeeded_at=NULL`, 시도 기록 각 1건을 격리 DB에서 확인했다. 재실행에서 처리할 작업 0건을 확인했다. 03의 자동 예약 실행과 Gmail 발송은 수행하지 않았고 워크플로는 비활성 상태다.
+
+## 04 Approved Gmail Test — 승인된 주소 전용
+
+[`workflows/TWO_PICK_04_APPROVED_GMAIL_TEST.json`](workflows/TWO_PICK_04_APPROVED_GMAIL_TEST.json)은 03을 운영 발송으로 전환하지 않고 **수동 실행만**으로 승인된 테스트 메일 두 건을 확인하기 위한 별도 비활성 워크플로다. JSON에는 개인 이메일 주소·Gmail 자격 증명 ID·토큰이 없다. HTTP Request 노드에 03과 같은 내부 Header Auth, Gmail 노드에 승인된 로컬 Gmail 자격 증명을 **가져온 환경에서만** 연결한다. 기본 FastAPI 주소는 격리 DB를 쓰는 `127.0.0.1:8002`이며 다른 환경에서는 노드 URL을 수정한다.
+
+백엔드의 Git 제외 `.env`에 `TWO_PICK_N8N_ENABLE_TEST_EMAIL=1`과 승인된 `TWO_PICK_N8N_TEST_RECIPIENT`를 설정한다. 수신 주소를 Git 파일·명령 출력·증빙에 적지 않는다. 테스트 계정 자체는 `example.test` 주소여야 한다. 서버는 이 환경의 승인 수신 주소만 n8n에 반환하며, 같은 격리 DB에서 이메일 시도를 **최대 2회**만 선점한다. 실패한 시도도 한도에 포함된다. 한 번의 수동 실행은 가장 먼저 도래한 작업 **1건만** 처리한다. 실행 전 `GET /internal/notifications/due`의 작업 ID와 동의·일정 상태를 확인한다.
+
+정상 경로는 `due → test_email claim → verify → Gmail send → Gmail 접수 ID 추출 → sent 결과 기록`이다. 본문은 D-1 `내일은 함께 등록한 일정이 있습니다.`, 당일 `오늘은 함께 등록한 일정이 있습니다.`이고 제목은 `TWO PICK 일정 알림 (테스트)`다. 개인정보가 담긴 일정 제목은 포함하지 않는다. `sent`는 Gmail 노드가 접수 ID를 반환하고 백엔드 원장에 저장된 경우에만 표시한다. 실제 수신함 도착은 별도 확인해야 한다.
+
+Gmail 노드나 결과 기록 단계가 실패하면 **같은 작업을 재실행하지 않는다.** 특히 Gmail 응답 이후 DB 콜백이 실패하면 이미 발송됐을 수 있으므로 n8n 실행·Gmail 발신함·DB를 수동으로 대조해야 한다. 성공 뒤 재실행해도 이미 `sent`인 작업은 선점하지 않는다. 04 워크플로는 게시하지 않는다. 운영 서비스 메일 발송 정책으로 사용하지 않는다.
+
+### 2026-11-25 실제 승인 시험
+
+첫 시도에서는 기존 Gmail 자격 증명이 만료되어 Gmail 노드가 실패했고 **메일은 발송되지 않았다**. 격리 DB의 해당 시도를 `failed/auth_error`로 보존했다. 사용자가 자격 증명을 재연결한 후 새 격리 DB에서 당일·D-1을 한 건씩 수동 실행했다. Gmail 접수 ID와 DB `sent`/성공 시각을 각각 확인했고 승인된 테스트 수신함에 **당일 1통, D-1 1통**이 도착했다. n8n이 본문 뒤에 자동 발송 안내 문구를 추가했다. 세 번째 실행은 처리할 작업이 0건이었고 이미 보낸 작업 및 새 작업의 추가 선점은 409였다. 테스트 후 `TWO_PICK_N8N_ENABLE_TEST_EMAIL=0`으로 바꾸고 로컬 `.env`의 테스트 주소를 제거했다. 04는 계속 비활성 상태다. 실제 주소, Gmail 접수 ID, 실행 원문은 Git에 올리지 않는다.
