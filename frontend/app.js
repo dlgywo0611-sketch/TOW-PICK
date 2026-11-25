@@ -26,8 +26,13 @@ const elements = {
   memberA: document.querySelector('#member-a'),
   memberB: document.querySelector('#member-b'),
   connectUsb: document.querySelector('#connect-usb'),
+  disconnectUsb: document.querySelector('#disconnect-usb'),
   connectBle: document.querySelector('#connect-ble'),
+  disconnectBle: document.querySelector('#disconnect-ble'),
   petdockStatus: document.querySelector('#petdock-status'),
+  petdockError: document.querySelector('#petdock-error'),
+  petdockErrorMessage: document.querySelector('#petdock-error-message'),
+  dismissPetdockError: document.querySelector('#dismiss-petdock-error'),
   petEvent: document.querySelector('#pet-event'),
   ledControls: document.querySelector('#led-controls'),
 };
@@ -73,11 +78,23 @@ function renderDeviceState() {
   elements.petdockStatus.innerHTML = `<i></i> ${connected ? `${labels.join(' + ')} 연결됨` : '연결 대기'}`;
   elements.connectUsb.textContent = deviceState.usb ? 'USB 연결됨' : 'USB 연결';
   elements.connectUsb.disabled = deviceState.usb;
+  elements.disconnectUsb.classList.toggle('hidden', !deviceState.usb);
   elements.connectBle.textContent = deviceState.ble ? '블루투스 연결됨' : '블루투스 연결';
   elements.connectBle.disabled = deviceState.ble;
+  elements.disconnectBle.classList.toggle('hidden', !deviceState.ble);
   elements.ledControls.querySelectorAll('button').forEach((button) => {
     button.disabled = !deviceState.ble;
   });
+}
+
+function showDeviceError(message) {
+  elements.petdockErrorMessage.textContent = message;
+  elements.petdockError.classList.remove('hidden');
+  elements.petEvent.textContent = '연결이 끊겼거나 오류가 발생했어요.';
+}
+
+function hideDeviceError() {
+  elements.petdockError.classList.add('hidden');
 }
 
 function setButtonBusy(button, busy, label) {
@@ -288,29 +305,62 @@ elements.logoutButton.addEventListener('click', async () => {
 
 elements.connectUsb.addEventListener('click', async () => {
   hideAlert();
+  hideDeviceError();
   setButtonBusy(elements.connectUsb, true, '연결 중…');
   try {
     await petDock.connectUsb();
     showAlert('Arduino USB가 연결되었습니다.', true);
   } catch (error) {
     showAlert(error.message);
+    showDeviceError(error.message);
   } finally {
     if (!deviceState.usb) setButtonBusy(elements.connectUsb, false, '');
   }
 });
 
+elements.disconnectUsb.addEventListener('click', async () => {
+  hideAlert();
+  hideDeviceError();
+  setButtonBusy(elements.disconnectUsb, true, '해제 중…');
+  try {
+    await petDock.disconnectUsb();
+    showAlert('Arduino USB 연결을 해제했습니다.', true);
+  } catch (error) {
+    showAlert(error.message);
+    showDeviceError(`USB 연결은 해제했지만 종료 중 오류가 발생했습니다: ${error.message}`);
+  } finally {
+    setButtonBusy(elements.disconnectUsb, false, '');
+  }
+});
+
 elements.connectBle.addEventListener('click', async () => {
   hideAlert();
+  hideDeviceError();
   setButtonBusy(elements.connectBle, true, '검색 중…');
   try {
     await petDock.connectBluetooth();
     showAlert('Meem 블루투스가 연결되었습니다.', true);
   } catch (error) {
     showAlert(error.message);
+    showDeviceError(error.message);
   } finally {
     if (!deviceState.ble) setButtonBusy(elements.connectBle, false, '');
   }
 });
+
+elements.disconnectBle.addEventListener('click', async () => {
+  hideAlert();
+  hideDeviceError();
+  try {
+    await petDock.disconnectBluetooth();
+    showAlert('Meem 블루투스 연결을 해제했습니다.', true);
+  } catch (error) {
+    showAlert(error.message);
+    showDeviceError(error.message);
+  }
+});
+
+elements.dismissPetdockError.addEventListener('click', hideDeviceError);
 
 elements.ledControls.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-led]');
@@ -320,17 +370,20 @@ elements.ledControls.addEventListener('click', async (event) => {
     await petDock.setLed(button.dataset.led);
   } catch (error) {
     showAlert(error.message);
+    showDeviceError(error.message);
   }
 });
 
 petDock.addEventListener('usbstate', (event) => {
   deviceState.usb = event.detail.connected;
   renderDeviceState();
+  if (!event.detail.connected && event.detail.reason) showDeviceError(event.detail.reason);
 });
 
 petDock.addEventListener('blestate', (event) => {
   deviceState.ble = event.detail.connected;
   renderDeviceState();
+  if (!event.detail.connected && event.detail.reason) showDeviceError(event.detail.reason);
 });
 
 petDock.addEventListener('button', (event) => {
@@ -344,7 +397,10 @@ petDock.addEventListener('led', (event) => {
   elements.petEvent.textContent = `LED 상태: ${colorNames[event.detail.color]}`;
 });
 
-petDock.addEventListener('error', (event) => showAlert(event.detail.message));
+petDock.addEventListener('error', (event) => {
+  showAlert(event.detail.message);
+  showDeviceError(event.detail.message);
+});
 
 renderDeviceState();
 loadCurrentSession();

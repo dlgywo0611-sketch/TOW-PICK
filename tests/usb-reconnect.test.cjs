@@ -42,7 +42,7 @@ const navigator = { serial: { requestPort: async () => {
   const port = queue.shift();
   if (!port) throw new Error('no fake port queued');
   return port;
-} } };
+} }, bluetooth: { requestDevice: async () => { throw new Error('no fake BLE device queued'); } } };
 const context = {
   window: { isSecureContext: true },
   navigator, EventTarget, Event, CustomEvent: CustomEventPolyfill,
@@ -145,5 +145,22 @@ async function until(predicate, label) {
   };
   await assert.rejects(() => bridge.setLed('red'), /BLE 쓰기를 지원하지 않습니다/);
 
-  console.log('PASS: USB reconnect, BTN_A/BTN_B parsing, BLE capability selection, R/G/B/X writes');
+  // 7. Explicit BLE disconnect clears both device and characteristic state.
+  const bleStates = [];
+  bridge.addEventListener('blestate', ev => bleStates.push(ev.detail.connected));
+  let disconnectCalls = 0;
+  const fakeBleDevice = new EventTarget();
+  fakeBleDevice.gatt = {
+    connected: true,
+    disconnect() { disconnectCalls += 1; this.connected = false; },
+  };
+  bridge.bluetoothDevice = fakeBleDevice;
+  bridge.bluetoothCharacteristic = { properties: { write: true } };
+  await bridge.disconnectBluetooth();
+  assert.equal(disconnectCalls, 1);
+  assert.equal(bridge.bluetoothDevice, null);
+  assert.equal(bridge.bluetoothCharacteristic, null);
+  assert.deepEqual(bleStates, [false]);
+
+  console.log('PASS: USB reconnect/disconnect, BLE cleanup, capability selection, R/G/B/X writes');
 })().catch(error => { console.error(error); process.exitCode = 1; });
