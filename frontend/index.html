@@ -14,9 +14,10 @@
     <script src="/static/decision-flow.js" defer></script>
     <script src="/static/feature-data.js" defer></script>
     <script src="/static/mock-features-logic.js" defer></script>
-    <script src="/static/mock-features.js" defer></script>
     <script src="/static/history-api-logic.js" defer></script>
     <script src="/static/history-api.js" defer></script>
+    <script src="/static/schedule-api-logic.js" defer></script>
+    <script src="/static/schedule-api.js" defer></script>
     <script src="/static/dashboard-logic.js" defer></script>
     <script src="/static/dashboard.js" defer></script>
     <script src="/static/service-shell-logic.js" defer></script>
@@ -389,27 +390,30 @@
                 <h3 id="schedule-title">우리의 기념일과 일정</h3>
                 <p>함께 기억할 날을 등록하고 월간 캘린더에서 확인해 보세요.</p>
               </div>
-              <span class="mock-badge">테스트 데이터</span>
+              <span class="mock-badge api-source-badge">실제 API · Asia/Seoul</span>
             </header>
 
             <div class="schedule-layout">
               <form id="schedule-form" class="schedule-form">
                 <h4>새 일정 등록</h4>
                 <label for="schedule-title-input">일정 이름</label>
-                <input id="schedule-title-input" name="title" maxlength="40" required placeholder="예: 100일 기념 데이트" />
+                <input id="schedule-title-input" name="title" maxlength="200" required placeholder="예: 100일 기념 데이트" />
                 <div class="schedule-form-row">
                   <label for="schedule-date-input">날짜
-                    <input id="schedule-date-input" name="date" type="date" required />
+                    <input id="schedule-date-input" name="local_date" type="date" required />
                   </label>
                   <label for="schedule-type-input">분류
-                    <select id="schedule-type-input" name="type">
+                    <select id="schedule-type-input" name="kind">
                       <option value="anniversary">기념일</option>
-                      <option value="date">데이트</option>
-                      <option value="todo">함께 할 일</option>
+                      <option value="schedule">일반 일정</option>
                     </select>
                   </label>
                 </div>
-                <button class="decision-primary" type="submit">일정 등록하기</button>
+                <div class="schedule-form-row">
+                  <label for="schedule-time-input">시간 (선택)<input id="schedule-time-input" name="local_time" type="time" /></label>
+                  <label for="schedule-repeat-input">반복<select id="schedule-repeat-input" name="repeat_rule"><option value="yearly">매년</option><option value="none">반복 없음</option><option value="weekly">매주</option><option value="monthly">매월</option></select></label>
+                </div>
+                <div class="schedule-form-actions"><button id="schedule-submit" class="decision-primary" type="submit">일정 등록하기</button><button id="schedule-cancel-edit" class="decision-secondary hidden" type="button">수정 취소</button></div>
                 <p id="schedule-form-status" class="history-meta" aria-live="polite"></p>
               </form>
 

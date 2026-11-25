@@ -288,6 +288,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .schedule-form input, .schedule-form select { width: 100%; min-height: 41px; margin-top: 5px; padding: 0 11px; border: 1px solid #cec7bb; border-radius: 8px; background: white; color: var(--ink); font-size: 11px; }
 .schedule-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .schedule-form .decision-primary { margin-top: 8px; }
+.schedule-form-actions { display: flex; gap: 8px; }
+.schedule-form-actions button { flex: 1; }
 .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
 .calendar-toolbar h4 { margin: 0; font: 500 20px Georgia, serif; }
 .calendar-toolbar button { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 50%; background: white; color: var(--ink); }
@@ -311,10 +313,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .schedule-item time span { color: var(--muted); font-size: 7px; }
 .schedule-item > div { min-width: 0; }
 .schedule-item > div > strong { display: block; margin-top: 4px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-item > div > small { display: block; margin-top: 4px; color: var(--muted); font-size: 8px; }
 .schedule-type { color: #7a5715; font-size: 8px; font-weight: 900; }
 .schedule-type.date { color: #9a4034; }
 .schedule-type.todo { color: var(--sage); }
 .schedule-item > button { padding: 6px; border: 0; background: transparent; color: #a45b50; font-size: 8px; font-weight: 800; }
+.schedule-item-actions { display: flex; gap: 5px; }
+.schedule-item-actions button { padding: 6px 8px; border: 1px solid #dccfc5; border-radius: 7px; background: white; color: #6e625a; font-size: 8px; font-weight: 800; }
 @media (max-width: 900px) { .schedule-list { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .schedule-layout { grid-template-columns: 1fr; } }
 @media (max-width: 650px) { .schedule-panel { padding: 18px; } .schedule-form-row { grid-template-columns: 1fr; } .calendar-card { padding: 12px; } .calendar-day { min-height: 57px; } .calendar-event { display: block; height: 5px; padding: 0; color: transparent; } .schedule-list { grid-template-columns: 1fr; } }
