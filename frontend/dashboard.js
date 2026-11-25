@@ -28,7 +28,7 @@
   function renderSchedules(schedules = []) {
     const items = scheduleLogic.upcomingOccurrences(schedules, new Date(), 3);
     if (!items.length) return renderEmpty(ui.schedules, '다가오는 일정이 없어요.');
-    ui.schedules.innerHTML = items.map((item) => `<div class="dashboard-item"><time datetime="${item.date}">${item.date.slice(5).replace('-', '.')}</time><div><strong>${escapeHtml(item.title)}</strong><small>${item.kind === 'anniversary' ? '기념일' : '일반 일정'} · ${item.local_time ? item.local_time.slice(0, 5) : '종일'}</small></div></div>`).join('');
+    ui.schedules.innerHTML = items.map((item) => `<div class="dashboard-item"><time datetime="${item.date}">${item.date.replace(/-/g, '.')}</time><div><strong>${escapeHtml(item.title)}</strong><small>${item.kind === 'anniversary' ? '기념일' : '일반 일정'} · ${item.local_time ? item.local_time.slice(0, 5) : '종일'}</small></div></div>`).join('');
   }
 
   function renderCouple() {
