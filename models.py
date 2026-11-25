@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
+    Time,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,6 +46,21 @@ class Couple(Base):
     )
 
     members: Mapped[list[User]] = relationship(back_populates="couple")
+
+
+class CoupleInvite(Base):
+    __tablename__ = "couple_invites"
+
+    couple_id: Mapped[int] = mapped_column(
+        ForeignKey("couples.id"), primary_key=True,
+    )
+    code: Mapped[str] = mapped_column(String(8), unique=True, nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+    )
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
 
 
 class User(Base):
@@ -174,6 +193,10 @@ class DecisionCandidate(Base):
             "version",
             name="uq_decision_candidate_version",
         ),
+        Index(
+            "uq_decision_current_candidate", "decision_id", unique=True,
+            sqlite_where=text("is_current = 1"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -229,3 +252,67 @@ class DecisionConfirmation(Base):
     confirmed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False,
     )
+
+
+class DecisionFeedback(Base):
+    __tablename__ = "decision_feedback"
+    __table_args__ = (UniqueConstraint("decision_id", "user_id",
+                                      name="uq_decision_feedback_user"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    decision_id: Mapped[int] = mapped_column(ForeignKey("decisions.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    comment: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now,
+    )
+
+
+class CoupleSchedule(Base):
+    __tablename__ = "couple_schedules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    couple_id: Mapped[int] = mapped_column(ForeignKey("couples.id"), index=True)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    local_date: Mapped[date] = mapped_column(Date, nullable=False)
+    local_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    repeat_rule: Mapped[str] = mapped_column(String(20), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class NotificationSetting(Base):
+    __tablename__ = "notification_settings"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    d1_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    day_of_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    send_time: Mapped[time] = mapped_column(Time, nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(30), nullable=False)
+    consented_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NotificationJob(Base):
+    __tablename__ = "notification_jobs"
+    __table_args__ = (UniqueConstraint("dedupe_key", name="uq_notification_job_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    schedule_id: Mapped[int] = mapped_column(ForeignKey("couple_schedules.id"), index=True)
+    schedule_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    recipient_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    notification_type: Mapped[str] = mapped_column(String(10), nullable=False)
+    occurrence_date: Mapped[date] = mapped_column(Date, nullable=False)
+    send_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    succeeded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

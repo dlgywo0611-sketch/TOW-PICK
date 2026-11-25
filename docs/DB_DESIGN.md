@@ -103,7 +103,7 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 
 현재 스키마 초기화 방식인 `Base.metadata.create_all()`은 기존 테이블이나 행을 삭제하지 않고 `decision_conditions`가 없을 때 새 테이블만 생성한다. 별도 migration 도구와 schema version 이력은 아직 없으므로 배포 전 DB 백업 및 신규 테이블 생성 확인은 운영 절차로 남는다.
 
-후보가 생성된 뒤 조건이 바뀌어 추천 근거와 Candidate가 불일치하는 일을 막기 위해, 현재 정책은 Candidate 1건 이상 존재 시 조건의 최초 저장과 수정 모두 거부한다. 향후 조건 version과 Candidate 입력 snapshot을 도입하기 전까지 이 정책을 유지한다.
+후보가 생성된 뒤 조건이 바뀌어 추천 근거와 Candidate가 불일치하는 일을 막기 위해 Candidate 1건 이상 존재 시 조건의 최초 저장과 수정 모두 거부한다. 추천 시도 원장이 존재하면 결과가 `no_match`여서 후보가 없어도 조건 변경을 거부한다. 향후 조건 version과 Candidate 입력 snapshot을 도입하기 전까지 이 정책을 유지한다.
 
 ### DecisionCandidate
 
@@ -139,7 +139,7 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 3. 개인 조건은 `(decision_id, user_id)` unique로 사용자별 결정당 1행을 유지한다.
 4. 현재 후보에 대한 서로 다른 승인 사용자 수가 2이고 커플 구성원이 정확히 2명이면 결정 상태를 `confirmed`로 바꾼다.
 5. 확정 이후 후보 생성과 승인은 `status != open` 검사로 막는다.
-6. 현재 구현은 정상적인 순차 요청을 처리하지만 동시 버전 생성·동시 승인·동시 조건 PUT의 원자성은 별도 보강 대상이다.
+6. 2차 백엔드에서는 관련 SQLite 쓰기를 `BEGIN IMMEDIATE`로 직렬화하고 별도 연결의 경쟁 테스트를 추가했다. 다중 프로세스 부하 검증은 남아 있다.
 
 ## 타 커플 접근 차단 원칙
 
@@ -153,11 +153,11 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 
 ## SQLite 제약 관련 주의
 
-모델에는 `ForeignKey`가 선언되어 있지만 현재 `database.py`는 연결 시 `PRAGMA foreign_keys=ON`을 설정하지 않는다. SQLite 기본 설정에서는 FK가 실제로 강제되지 않을 수 있으므로 고아 행 방지를 위해 연결 이벤트 설정과 마이그레이션 검증이 필요하다. unique constraint는 현재도 DB에서 강제된다.
+`database.py`의 기본 engine 연결은 `PRAGMA foreign_keys=ON` 및 `busy_timeout=5000`을 설정한다. 테스트에서 별도 생성한 SQLite engine은 해당 연결 이벤트를 별도로 설정해야 같은 FK 강제를 받는다. unique constraint는 DB에서 강제된다.
 
-## 계획 모델 (`planned`, 미구현)
+## 확장 모델 현황
 
-아래는 설계 방향이며 이번 WBS에서 테이블이나 API를 생성하지 않는다.
+아래 각 항목의 `implemented`/`planned` 표시를 기준으로 읽는다. PET 영역은 여전히 설계 제안이며 테이블·API가 없다.
 
 ### DecisionConfirmation — 최종 결정 기록 (`implemented`, 2026-11-25)
 
@@ -169,9 +169,9 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 | `content_snapshot`, `version` | 이후 후보 데이터 변화와 무관한 최종 기록 |
 | `confirmed_at` | 확정 시각 |
 
-양측 승인으로 `Decision.status`를 `confirmed`로 바꾸는 트랜잭션에서 후보 ID, version, content snapshot과 확정 시각을 한 건 저장한다. `decision_id` unique로 중복 기록을 막는다. 신규 테이블 생성은 기존 행을 삭제하지 않는다. 이 변경 전에 이미 확정된 Decision에는 기록 행이 자동 생성되지 않으며, 기존 상세 조회는 계속 동작한다. 이력 이관은 백업과 원본 후보 확인 후 별도 수행해야 한다. 동시 승인 원자성은 별도 검증 대상이다.
+양측 승인으로 `Decision.status`를 `confirmed`로 바꾸는 트랜잭션에서 후보 ID, version, content snapshot과 확정 시각을 한 건 저장한다. `decision_id` unique로 중복 기록을 막는다. 신규 테이블 생성은 기존 행을 삭제하지 않는다. 이 변경 전에 이미 확정된 Decision에는 기록 행이 자동 생성되지 않으며, 기존 상세 조회는 계속 동작한다. 이력 이관은 백업과 원본 후보 확인 후 별도 수행해야 한다. 별도 SQLite 연결의 병렬 승인 자동 테스트는 통과했으며 다중 프로세스 부하 검증은 남아 있다.
 
-### DecisionFeedback — 만족도/간단 피드백
+### DecisionFeedback — 만족도/간단 피드백 (`implemented`, 2026-11-25 2차)
 
 | 제안 필드 | 목적 |
 |---|---|
@@ -206,16 +206,25 @@ API는 로그인 사용자의 ID와 `couple_id`를 서버에서 채우며, 조�
 
 공동결정 경험치는 `UNIQUE(couple_id, event_type, source_id)`로 중복 지급을 막는다. 확정 트랜잭션에서 원장 행 삽입이 성공한 경우에만 `PetState.experience`를 증가시키거나, 원장 합계를 경험치의 기준값으로 사용한다. API의 사전 조회만으로 중복을 막지 않고 DB unique를 최종 방어선으로 둔다.
 
-### CoupleSchedule — 기념일/일정
+### CoupleSchedule — 기념일/일정 (`implemented`, 2026-11-25 2차)
 
 | 제안 필드 | 목적 |
 |---|---|
 | `id`, `couple_id` | 일정 PK와 소유 커플 |
 | `created_by_id` | 작성 사용자 |
-| `title`, `scheduled_at` | 일정 내용과 시각 |
+| `title`, `local_date`, `local_time` | 일정 이름·한국 현지 날짜와 선택 시간(null이면 종일) |
 | `kind`, `repeat_rule` | 기념일/일정 구분과 반복 규칙 |
+| `revision`, `deleted_at` | 수정 버전, soft delete 시각 |
 
 조회·수정·삭제는 모두 현재 커플로 제한하고, `created_by_id`는 감사 정보로 유지하되 공유 데이터의 접근 권한은 `couple_id`로 판정한다.
+
+`CoupleInvite`는 `couple_id` PK/FK, 현재 `code` unique, `issued_at`, `used_at`을 저장한다. 발급 시각이 없는 기존 초대 코드에는 임의 날짜를 채우지 않고 재발급 전까지 만료로 취급한다. 기존 연결 관계와 다른 테이블 행은 유지한다.
+
+후보별 current 제약은 `decision_candidates(decision_id) WHERE is_current=1` 부분 unique index로 보강했다. `decision_id, version`, 후보별 사용자 승인, Decision별 확정 기록의 기존 unique 제약을 유지한다. 조건·추천·후보·승인 수정은 SQLite `BEGIN IMMEDIATE`로 읽기 전 쓰기 잠금을 얻어 다른 연결과 직렬화한다. 기존 DB에 중복 current 후보가 있으면 index 생성이 실패하며 백업 후 수동 정합성 복구가 필요하다. 자동으로 후보 기록을 삭제하거나 고치지 않는다.
+
+`DecisionFeedback`은 `(decision_id, user_id)` unique, `score` 1~5, 선택 `comment` 최대 500자와 생성·수정 시각을 저장한다. 서버가 JWT 사용자와 결정의 `couple_id`를 검증하고 개인 GET/PUT만 제공한다. 점수 범위와 글자 길이는 API schema에서 검증하며 기존 SQLite 테이블에 DB CHECK를 추가하지 않는다.
+
+`NotificationSetting`은 `user_id` PK/FK, 기본 미동의, D-1/당일 선택, 한국 현지 발송 시각, 정책 버전, 동의·철회 시각을 가진다. 설정 행이 없어도 GET은 미동의 기본값을 반환한다. `NotificationJob`은 일정 ID/FK, revision, 수신 사용자 ID/FK, 알림 종류, 발생 날짜, UTC 예정 시각, SHA-256 dedupe key unique, 상태·시도 횟수·성공·실패 시각을 저장한다. 동일 key는 중복 삽입하지 않는다. 일정 삭제는 원장을 보존하기 위해 soft delete하고 미발송 작업을 취소한다. 현재는 `pending`/`canceled` 예약 기반만 사용하며 발송·실패 재시도 worker는 없다.
 
 ## 우선 보강 순서
 
