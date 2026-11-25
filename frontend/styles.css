@@ -233,12 +233,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .decision-notice strong { display: block; margin-bottom: 4px; font-size: 12px; }
 .decision-notice p { margin: 0; font-size: 11px; line-height: 1.55; }
 .decision-notice .decision-secondary { background: white; border-color: #d3a64b; white-space: nowrap; }
+.decision-notice-actions { display: flex; gap: 7px; }
 .decision-template-row { display: flex; flex-wrap: wrap; gap: 7px; }
 .decision-template-row button { padding: 7px 9px; border: 1px solid #d8d0c4; border-radius: 999px; background: white; color: #5f5a52; font-size: 10px; }
 .decision-template-row button:hover, .decision-template-row button:focus-visible { border-color: var(--coral); color: #a64032; }
 @media (max-width: 1000px) { .decision-option { grid-template-columns: repeat(2, minmax(0, 1fr)); } .decision-option .decision-remove { grid-column: 1 / -1; } }
 @media (max-width: 800px) { .decision-progress { grid-template-columns: 1fr; } }
-@media (max-width: 650px) { .decision-workspace { padding: 18px; } .decision-heading { display: block; } .decision-heading button { margin-top: 14px; } .decision-top-grid { grid-template-columns: 1fr; } .decision-option { grid-template-columns: 1fr; } .decision-card-heading { display: block; } .decision-card-heading button { margin-top: 10px; } .decision-current-bar { align-items: start; flex-direction: column; } .decision-progress-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .decision-notice { grid-template-columns: auto 1fr; } .decision-notice .decision-secondary { grid-column: 1 / -1; width: 100%; } }
+@media (max-width: 650px) { .decision-workspace { padding: 18px; } .decision-heading { display: block; } .decision-heading button { margin-top: 14px; } .decision-top-grid { grid-template-columns: 1fr; } .decision-option { grid-template-columns: 1fr; } .decision-card-heading { display: block; } .decision-card-heading button { margin-top: 10px; } .decision-current-bar { align-items: start; flex-direction: column; } .decision-progress-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .decision-notice { grid-template-columns: auto 1fr; } .decision-notice-actions { grid-column: 1 / -1; flex-direction: column; } .decision-notice .decision-secondary { width: 100%; } }
 
 /* Mock-only screens that can be wired to the future history API without changing the layout. */
 .memories-panel { margin-top: 26px; padding: 28px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: #fffefa; box-shadow: var(--shadow-sm); }

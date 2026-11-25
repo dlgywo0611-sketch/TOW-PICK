@@ -35,6 +35,7 @@
     recommendationNoticeTitle: $('#decision-recommendation-notice-title'),
     recommendationNoticeMessage: $('#decision-recommendation-notice-message'),
     openManual: $('#decision-open-manual'),
+    startNew: $('#decision-start-new'),
     candidateText: $('#decision-candidate-text'),
     approvalCount: $('#decision-approval-count'),
     approvalMembers: $('#decision-approval-members'),
@@ -390,6 +391,11 @@
   ui.openManual.addEventListener('click', () => {
     ui.manualForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
     ui.manualInput.focus({ preventScroll: true });
+  });
+  ui.startNew.addEventListener('click', () => {
+    ui.createForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    ui.createForm.querySelector('input[name="title"]').focus({ preventScroll: true });
+    showAlert('새로운 공동결정은 새로운 조건과 1회의 추천 기회를 사용합니다.');
   });
   ui.manualForm.addEventListener('click', (event) => {
     const template = event.target.closest('[data-manual-template]');

@@ -60,6 +60,7 @@ const errorMessages = {
   'Token has been revoked': '로그아웃된 세션입니다. 다시 로그인해 주세요.',
   'Conditions not found': '아직 내 조건을 제출하지 않았어요.',
   'Conditions cannot be changed after candidate creation': '후보가 생성된 뒤에는 개인 조건을 수정할 수 없어요.',
+  'Conditions cannot be changed after recommendation attempt': '추천 시도 후에는 조건을 수정할 수 없습니다. 수동 후보를 등록하거나 새 공동결정을 시작해 주세요.',
   'Both couple members must submit conditions before recommendation': '두 사람이 모두 조건을 제출해야 추천할 수 있어요.',
   'Both couple members must submit conditions before candidate creation': '두 사람이 모두 조건을 제출해야 후보를 만들 수 있어요.',
   'Recommendation already attempted for this decision': '이 결정의 추천 기회는 이미 사용했어요. 수동 후보를 등록할 수 있어요.',
@@ -70,6 +71,13 @@ const errorMessages = {
   'Feedback not found': '아직 작성한 만족도 평가가 없습니다.',
   'User already approved this candidate': '이미 승인한 후보예요.',
   'Only the current candidate can be approved': '최신 후보만 승인할 수 있어요.',
+  'Decision not found': '공동결정을 찾을 수 없습니다.',
+  'You cannot access this decision': '이 공동결정에 접근할 권한이 없습니다.',
+  'Schedule not found': '일정을 찾을 수 없습니다.',
+  'You cannot access this schedule': '이 일정에 접근할 권한이 없습니다.',
+  'Concurrent update; retry the request': '다른 요청과 동시에 처리되었습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.',
+  'Couple join conflicted with another update': '동시에 커플 연결이 처리되었습니다. 연결 상태를 새로고침해 주세요.',
+  'Recommendation request conflicted with another update': '동시에 추천 요청이 처리되었습니다. 결정 상태를 새로고침해 주세요.',
 };
 
 function showAlert(message, success = false) {
