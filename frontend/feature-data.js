@@ -2,7 +2,7 @@
   const sources = Object.freeze({
     auth: 'api', couple: 'api', decisions: 'api', confirmations: 'api',
     history: 'api', satisfaction: 'api', schedules: 'api', notifications: 'mock',
-    petGrowth: 'mock', profileSettings: 'local', notificationSettings: 'local',
+    petGrowth: 'mock', profileSettings: 'local', notificationSettings: 'api',
   });
   const mockData = Object.freeze({
     history: Object.freeze([

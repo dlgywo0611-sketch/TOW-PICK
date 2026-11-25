@@ -1,5 +1,5 @@
 (function exposeSettingsLogic(root) {
-  const DEFAULT_PREFERENCES = Object.freeze({ decision: true, schedule: true, pet: true });
+  const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({ consent: false, d1_enabled: false, day_of_enabled: false, send_time: '09:00' });
 
   function normalizeNickname(value) {
     return String(value || '').trim().replace(/\s+/g, ' ').slice(0, 50);
@@ -11,11 +11,10 @@
     return { valid: true, message: '', value: nickname };
   }
 
-  function normalizePreferences(value = {}) {
-    return Object.fromEntries(Object.entries(DEFAULT_PREFERENCES).map(([key, fallback]) => [
-      key, typeof value[key] === 'boolean' ? value[key] : fallback,
-    ]));
+  function normalizeNotificationSettings(value = {}) {
+    const sendTime = String(value.send_time || '09:00').slice(0, 5);
+    return { consent: value.consent === true, d1_enabled: value.d1_enabled === true, day_of_enabled: value.day_of_enabled === true, send_time: /^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime) ? sendTime : '09:00' };
   }
 
-  root.TwoPickSettingsLogic = { DEFAULT_PREFERENCES, normalizeNickname, validateNickname, normalizePreferences };
+  root.TwoPickSettingsLogic = { DEFAULT_NOTIFICATION_SETTINGS, normalizeNickname, validateNickname, normalizeNotificationSettings };
 }(typeof window !== 'undefined' ? window : globalThis));

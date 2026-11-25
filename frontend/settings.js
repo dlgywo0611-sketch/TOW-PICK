@@ -1,54 +1,15 @@
 (() => {
   'use strict';
-  const logic = globalThis.TwoPickSettingsLogic;
-  const root = document.querySelector('.couple-profile-panel');
-  if (!logic || !root) return;
-  const keys = { nickname: 'tow_pick_local_nickname', preferences: 'tow_pick_preferences' };
-  const ui = {
-    form: root.querySelector('#profile-settings-form'), nickname: root.querySelector('#settings-nickname'),
-    email: root.querySelector('#settings-email'), logout: root.querySelector('#settings-logout'),
-    decision: root.querySelector('#setting-decision-notifications'),
-    schedule: root.querySelector('#setting-schedule-notifications'), pet: root.querySelector('#setting-pet-notifications'),
-  };
-
-  function readPreferences() {
-    try { return logic.normalizePreferences(JSON.parse(localStorage.getItem(keys.preferences) || '{}')); }
-    catch (_) { return logic.normalizePreferences(); }
-  }
-
-  function render() {
-    if (!state.user) return;
-    const localNickname = logic.normalizeNickname(localStorage.getItem(keys.nickname));
-    ui.nickname.value = localNickname || state.user.nickname;
-    ui.email.value = state.user.email || '';
-    const preferences = readPreferences();
-    ui.decision.checked = preferences.decision;
-    ui.schedule.checked = preferences.schedule;
-    ui.pet.checked = preferences.pet;
-    if (localNickname) {
-      elements.profileName.textContent = localNickname;
-      elements.profileAvatar.textContent = localNickname.slice(0, 1).toUpperCase();
-    }
-  }
-
-  ui.form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const result = logic.validateNickname(ui.nickname.value);
-    if (!result.valid) { showAlert(result.message); ui.nickname.focus(); return; }
-    localStorage.setItem(keys.nickname, result.value);
-    ui.nickname.value = result.value;
-    render();
-    showAlert('표시 이름을 이 기기에 저장했습니다.', true);
-  });
-
-  [ui.decision, ui.schedule, ui.pet].forEach((input) => input.addEventListener('change', () => {
-    localStorage.setItem(keys.preferences, JSON.stringify({
-      decision: ui.decision.checked, schedule: ui.schedule.checked, pet: ui.pet.checked,
-    }));
-    showAlert('알림 설정을 이 기기에 저장했습니다.', true);
-  }));
-
+  const logic = globalThis.TwoPickSettingsLogic; const root = document.querySelector('.couple-profile-panel'); if (!logic || !root) return;
+  const nicknameKey = 'tow_pick_local_nickname';
+  const ui = { profileForm: root.querySelector('#profile-settings-form'), nickname: root.querySelector('#settings-nickname'), email: root.querySelector('#settings-email'), logout: root.querySelector('#settings-logout'), notificationForm: root.querySelector('#notification-settings-form'), consent: root.querySelector('#setting-notification-consent'), d1: root.querySelector('#setting-d1-enabled'), dayOf: root.querySelector('#setting-day-of-enabled'), sendTime: root.querySelector('#setting-send-time'), notificationSave: root.querySelector('#notification-settings-save'), notificationStatus: root.querySelector('#notification-settings-status') };
+  let loadingNotifications = false;
+  function renderProfile() { if (!state.user) return; const localNickname = logic.normalizeNickname(localStorage.getItem(nicknameKey)); ui.nickname.value = localNickname || state.user.nickname; ui.email.value = state.user.email || ''; if (localNickname) { elements.profileName.textContent = localNickname; elements.profileAvatar.textContent = localNickname.slice(0, 1).toUpperCase(); } }
+  function applyNotificationSettings(value) { const settings = logic.normalizeNotificationSettings(value); ui.consent.checked = settings.consent; ui.d1.checked = settings.d1_enabled; ui.dayOf.checked = settings.day_of_enabled; ui.sendTime.value = settings.send_time; ui.d1.disabled = !settings.consent; ui.dayOf.disabled = !settings.consent; ui.sendTime.disabled = !settings.consent; }
+  async function loadNotifications() { if (!state.user || loadingNotifications) return; loadingNotifications = true; try { const settings = await api('/notifications/settings/me'); applyNotificationSettings(settings); ui.notificationStatus.textContent = settings.consent ? '알림 설정이 저장되어 있어요. 실제 이메일 발송은 아직 제공되지 않습니다.' : '현재 알림 수신에 동의하지 않았어요. 실제 이메일 발송은 아직 제공되지 않습니다.'; } catch (error) { ui.notificationStatus.textContent = error.message; } finally { loadingNotifications = false; } }
+  ui.profileForm.addEventListener('submit', (event) => { event.preventDefault(); const result = logic.validateNickname(ui.nickname.value); if (!result.valid) { showAlert(result.message); ui.nickname.focus(); return; } localStorage.setItem(nicknameKey, result.value); ui.nickname.value = result.value; renderProfile(); showAlert('표시 이름을 이 기기에 저장했습니다.', true); });
+  ui.consent.addEventListener('change', () => { ui.d1.disabled = !ui.consent.checked; ui.dayOf.disabled = !ui.consent.checked; ui.sendTime.disabled = !ui.consent.checked; });
+  ui.notificationForm.addEventListener('submit', async (event) => { event.preventDefault(); const payload = logic.normalizeNotificationSettings({ consent: ui.consent.checked, d1_enabled: ui.consent.checked && ui.d1.checked, day_of_enabled: ui.consent.checked && ui.dayOf.checked, send_time: ui.sendTime.value }); setButtonBusy(ui.notificationSave, true, '저장 중…'); try { const saved = await api('/notifications/settings/me', { method: 'PUT', body: JSON.stringify(payload) }); applyNotificationSettings(saved); ui.notificationStatus.textContent = saved.consent ? '알림 동의와 예약 설정을 저장했습니다. 실제 이메일 발송은 아직 제공되지 않습니다.' : '알림 동의를 철회했습니다. 예약된 알림 작업도 취소됩니다.'; window.dispatchEvent(new CustomEvent('twopick:notification-settings-changed', { detail: saved })); } catch (error) { ui.notificationStatus.textContent = error.message; } finally { setButtonBusy(ui.notificationSave, false, ''); } });
   ui.logout.addEventListener('click', () => elements.logoutButton.click());
-  window.addEventListener('twopick:session-changed', render);
-  render();
+  window.addEventListener('twopick:session-changed', () => { renderProfile(); void loadNotifications(); }); renderProfile(); void loadNotifications();
 })();

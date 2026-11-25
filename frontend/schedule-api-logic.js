@@ -20,5 +20,10 @@
     return dates.map((date) => ({ ...schedule, date: isoDate(date), type: schedule.kind }));
   }
   function calendarEvents(schedules, year, month) { return schedules.flatMap((item) => occurrencesForMonth(item, year, month)); }
-  root.TwoPickScheduleApiLogic = { validateInput, occurrencesForMonth, calendarEvents };
+  function upcomingOccurrences(schedules, from = new Date(), limit = 3) {
+    const start = new Date(from.getFullYear(), from.getMonth(), from.getDate()); const found = [];
+    for (let offset = 0; offset < 13; offset += 1) { const monthDate = new Date(start.getFullYear(), start.getMonth() + offset, 1); found.push(...calendarEvents(schedules, monthDate.getFullYear(), monthDate.getMonth()).filter((item) => parseDate(item.date) >= start)); }
+    return found.sort((a, b) => a.date.localeCompare(b.date)).filter((item, index, all) => all.findIndex((other) => other.id === item.id && other.date === item.date) === index).slice(0, limit);
+  }
+  root.TwoPickScheduleApiLogic = { validateInput, occurrencesForMonth, calendarEvents, upcomingOccurrences };
 }(typeof window !== 'undefined' ? window : globalThis));
