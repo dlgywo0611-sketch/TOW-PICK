@@ -23,6 +23,8 @@
     <script src="/static/notifications.js" defer></script>
     <script src="/static/couple-profile-logic.js" defer></script>
     <script src="/static/couple-profile.js" defer></script>
+    <script src="/static/our-pet-logic.js" defer></script>
+    <script src="/static/our-pet.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">본문으로 바로가기</a>
@@ -424,7 +426,29 @@
           </section>
 
           <section class="petdock-panel" data-service-page="pet" aria-labelledby="petdock-title">
-            <header class="petdock-heading">
+            <div class="our-pet-profile" aria-labelledby="our-pet-title">
+              <header class="memories-heading">
+                <div><p class="eyebrow coral">OUR PET · GROWTH</p><h3 id="our-pet-title">우리와 함께 자라는 몽글이</h3><p>함께 결정하고 일정을 지키며 펫의 경험치를 쌓아보세요.</p></div>
+                <span class="mock-badge">임시 에셋 · 테스트 데이터</span>
+              </header>
+              <div class="our-pet-hero">
+                <div class="our-pet-avatar" aria-label="임시 펫 캐릭터"><span>●</span><b>ᴥ</b><span>●</span><i></i></div>
+                <div class="our-pet-level">
+                  <div><span>LEVEL 3</span><strong>몽글이</strong><small>호기심 많은 우리 펫</small></div>
+                  <div class="our-pet-exp-copy"><span>경험치</span><strong id="our-pet-exp-label">65 / 100 EXP</strong></div>
+                  <div class="our-pet-progress" role="progressbar" aria-label="OUR PET 성장 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="65"><span id="our-pet-exp-bar"></span></div>
+                  <p id="our-pet-next-level">다음 레벨까지 35 EXP 남았어요.</p>
+                </div>
+                <div class="our-pet-stats">
+                  <div><span>오늘의 기분</span><strong>설렘</strong></div>
+                  <div><span>함께한 결정</span><strong>3회</strong></div>
+                  <div><span>연속 방문</span><strong>5일</strong></div>
+                </div>
+              </div>
+              <div class="our-pet-device-summary"><span id="our-pet-device-dot"></span><div><strong>PET DOCK 상태</strong><p id="our-pet-device-text">USB와 BLE 연결을 기다리고 있어요.</p></div><button id="our-pet-show-device" type="button">연결 설정 보기</button></div>
+            </div>
+
+            <header id="petdock-device-section" class="petdock-heading">
               <div>
                 <p class="eyebrow coral">PET DOCK · DEVICE</p>
                 <h3 id="petdock-title">우리 펫과 연결해요.</h3>
