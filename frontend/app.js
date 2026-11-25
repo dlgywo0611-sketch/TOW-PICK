@@ -39,6 +39,11 @@ const elements = {
 
 const petDock = new PetDockBridge();
 const deviceState = { usb: false, ble: false };
+const requestState = { pending: 0, mutations: new Set() };
+const requestUi = {
+  loading: document.querySelector('#global-loading'),
+  offline: document.querySelector('#offline-banner'),
+};
 
 const errorMessages = {
   'Incorrect email or password': '이메일 또는 비밀번호가 올바르지 않습니다.',
@@ -106,22 +111,57 @@ function setButtonBusy(button, busy, label) {
 }
 
 async function api(path, options = {}) {
+  const logic = globalThis.TwoPickErrorHandlingLogic;
+  const method = String(options.method || 'GET').toUpperCase();
+  const mutationKey = `${method}:${path}`;
+  if (logic.isMutation(method) && requestState.mutations.has(mutationKey)) {
+    throw new Error('이미 처리 중인 요청이에요. 잠시만 기다려 주세요.');
+  }
   const headers = new Headers(options.headers || {});
   if (state.token) headers.set('Authorization', `Bearer ${state.token}`);
   if (options.body && !(options.body instanceof URLSearchParams)) {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(path, { ...options, headers });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    const detail = payload.detail || '요청을 처리하지 못했습니다.';
-    const message = Array.isArray(detail) ? '입력값을 확인해 주세요.' :
-      (errorMessages[detail] || String(detail));
-    throw new Error(message);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  requestState.pending += 1;
+  if (logic.isMutation(method)) requestState.mutations.add(mutationKey);
+  requestUi.loading.classList.remove('hidden');
+  document.body.setAttribute('aria-busy', 'true');
+  try {
+    const response = await fetch(path, { ...options, headers, signal: options.signal || controller.signal });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      const message = logic.normalizeApiDetail(payload.detail, errorMessages);
+      if (response.status === 401 && state.token && path !== '/token') {
+        clearSession();
+        render();
+        throw new Error('로그인이 만료되었습니다. 다시 로그인해 주세요.');
+      }
+      throw new Error(message);
+    }
+    return response.status === 204 ? null : response.json();
+  } catch (error) {
+    if (error instanceof TypeError || error?.name === 'AbortError') throw new Error(logic.friendlyFetchError(error));
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    requestState.pending = Math.max(0, requestState.pending - 1);
+    requestState.mutations.delete(mutationKey);
+    if (!requestState.pending) {
+      requestUi.loading.classList.add('hidden');
+      document.body.removeAttribute('aria-busy');
+    }
   }
-  return response.status === 204 ? null : response.json();
 }
+
+function renderNetworkState() {
+  requestUi.offline.classList.toggle('hidden', navigator.onLine);
+}
+window.addEventListener('online', renderNetworkState);
+window.addEventListener('offline', renderNetworkState);
+renderNetworkState();
 
 function saveToken(token) {
   state.token = token;

@@ -7,6 +7,7 @@
     <meta name="theme-color" content="#fffaf4" />
     <title>OURVERSE — TWO PICK</title>
     <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/error-handling-logic.js" defer></script>
     <script src="/static/petdock-bridge.js" defer></script>
     <script src="/static/app.js" defer></script>
     <script src="/static/decision-flow-logic.js" defer></script>
@@ -29,6 +30,8 @@
     <script src="/static/settings.js" defer></script>
   </head>
   <body>
+    <div id="global-loading" class="global-loading hidden" role="progressbar" aria-label="요청 처리 중"></div>
+    <div id="offline-banner" class="offline-banner hidden" role="status">인터넷 연결이 끊겼어요. 연결이 복구되면 다시 시도해 주세요.</div>
     <a class="skip-link" href="#main-content">본문으로 바로가기</a>
     <header class="topbar">
       <a class="brand" href="/app" aria-label="OURVERSE 홈">
